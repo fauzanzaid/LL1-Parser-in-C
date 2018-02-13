@@ -3,6 +3,7 @@
 
 #include "ParserLL1.h"
 #include "LinkedList.h"
+#include "HashTable.h"
 
 
 /////////////////////
@@ -20,6 +21,7 @@ typedef struct ParserLL1{
 	int len_terminal_symbols;
 
 	int start_symbol;
+	int empty_symbol;
 
 
 	// Rules
@@ -53,7 +55,7 @@ static void Rule_destroy(Rule *rul_ptr);
 // Constructors & Destructors //
 ////////////////////////////////
 
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol){
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol){
 
 	// Allocate
 	ParserLL1 *psr_ptr = malloc( sizeof(ParserLL1) );
@@ -64,6 +66,7 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	psr_ptr->terminal_symbols = terminal_symbols;
 	psr_ptr->len_terminal_symbols = len_terminal_symbols;
 	psr_ptr->start_symbol = start_symbol;
+	psr_ptr->empty_symbol = empty_symbol;
 
 	// Initialize rule list
 	psr_ptr->rules = LinkedList_new();

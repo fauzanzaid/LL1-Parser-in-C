@@ -40,7 +40,7 @@ typedef struct ParserLL1 ParserLL1;
  * @param  start_symbol         The start symbol
  * @return                      Pointer to ParserLL1 struct
  */
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol);
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol);
 
 /**
  * Deallocates all internally allocated memory to the struct
