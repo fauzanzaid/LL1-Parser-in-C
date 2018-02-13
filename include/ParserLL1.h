@@ -36,11 +36,11 @@ typedef struct ParserLL1 ParserLL1;
  * @param  variable_symbols     Array of non terminal or variably symbols
  * @param  len_variable_symbols Length of array
  * @param  terminal_symbols     Array of terminal symbols
- * @param  terminal_symbols     Length of array
+ * @param  len_terminal_symbols Length of array
  * @param  start_symbol         The start symbol
  * @return                      Pointer to ParserLL1 struct
  */
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int terminal_symbols, int start_symbol);
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol);
 
 /**
  * Deallocates all internally allocated memory to the struct
