@@ -81,6 +81,7 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 		rul_ptr = LinkedListIterator_get_item(itr_ptr);
 		if(rul_ptr == NULL)	break;
 		Rule_destroy(rul_ptr);
+		LinkedListIterator_move_to_next(itr_ptr);
 	}
 	LinkedListIterator_destroy(itr_ptr);
 	LinkedList_destroy(psr_ptr->rules);
@@ -114,7 +115,8 @@ static void Rule_destroy(Rule *rul_ptr){
 //////////////////////
 
 void ParserLL1_add_rule(ParserLL1 *psr_ptr, int variable_symbol, int *expansion_symbols, int len_expansion_symbols){
-	
+	Rule *rul_ptr = Rule_new(variable_symbol, expansion_symbols, len_expansion_symbols);
+	LinkedList_pushback(psr_ptr->rules, rul_ptr);
 }
 
 Parser_InitializeResult_type ParserLL1_initialize_rules(ParserLL1 *psr_ptr){
