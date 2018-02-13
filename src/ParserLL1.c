@@ -6,6 +6,14 @@
 #include "HashTable.h"
 
 
+///////////////
+// Constants //
+///////////////
+
+static const int SYMBOL_CLASS_VARIABLE = 0;
+static const int SYMBOL_CLASS_TERMINAL = 1;
+
+
 /////////////////////
 // Data Structures //
 /////////////////////
@@ -22,6 +30,8 @@ typedef struct ParserLL1{
 
 	int start_symbol;
 	int empty_symbol;
+
+	HashTable *symbol_class_table;
 
 
 	// Rules
@@ -50,6 +60,10 @@ static Rule *Rule_new(int variable_symbol, int *expansion_symbols, int len_expan
 
 static void Rule_destroy(Rule *rul_ptr);
 
+static int hash_function(void *key);
+
+static int key_compare(void *key1, void *key2);
+
 
 ////////////////////////////////
 // Constructors & Destructors //
@@ -68,6 +82,11 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	psr_ptr->start_symbol = start_symbol;
 	psr_ptr->empty_symbol = empty_symbol;
 
+	// Initialize symbol class table
+	psr_ptr->symbol_class_table = HashTable_new(len_variable_symbols + len_terminal_symbols, hash_function, key_compare);
+	for (int i = 0; i < len_variable_symbols; ++i)	HashTable_add(psr_ptr->symbol_class_table, (void*)&variable_symbols[i], (void*)&SYMBOL_CLASS_VARIABLE);
+	for (int i = 0; i < len_terminal_symbols; ++i)	HashTable_add(psr_ptr->symbol_class_table, (void*)&terminal_symbols[i], (void*)&SYMBOL_CLASS_TERMINAL);
+
 	// Initialize rule list
 	psr_ptr->rules = LinkedList_new();
 
@@ -76,6 +95,9 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 }
 
 void ParserLL1_destroy(ParserLL1 *psr_ptr){
+	// Free symbol class table
+	HashTable_destroy(psr_ptr->symbol_class_table);
+
 	// Free rules
 	LinkedListIterator *itr_ptr = LinkedListIterator_new(psr_ptr->rules);
 	LinkedListIterator_move_to_first(itr_ptr);
@@ -133,4 +155,17 @@ Parser_InitializeResult_type ParserLL1_initialize_rules(ParserLL1 *psr_ptr){
 
 Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, int symbol){
 	
+}
+
+
+//////////
+// Hash //
+//////////
+
+static int hash_function(void *key){
+	return (*(int *)(key));
+}
+
+static int key_compare(void *key1, void *key2){
+	return *(int *)(key1) - *(int *)(key2);
 }
