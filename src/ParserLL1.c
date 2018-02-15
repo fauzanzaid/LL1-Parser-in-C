@@ -42,7 +42,7 @@ typedef struct ParserLL1{
 
 	// Rules
 
-	LinkedList *rules;
+	HashTable *rule_table;
 
 	BitSet *nullable_set;
 
@@ -53,10 +53,15 @@ typedef struct ParserLL1{
 
 }ParserLL1;
 
+typedef struct Rule Rule;
+
 typedef struct Rule{
 	int variable_symbol;
 	int *expansion_symbols;
 	int len_expansion_symbols;
+
+	// Next rule with the same variable symbol
+	Rule *next;
 }Rule;
 
 
@@ -123,8 +128,8 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	// Create nullable set
 	psr_ptr->nullable_set = BitSet_new(psr_ptr->variable_symbols_min, psr_ptr->variable_symbols_max);
 
-	// Create rule list
-	psr_ptr->rules = LinkedList_new();
+	// Create rule table
+	psr_ptr->rule_table = HashTable_new(len_variable_symbols, hash_function, key_compare);
 
 	// Create stack
 	psr_ptr->stack = LinkedList_new();
@@ -134,18 +139,16 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 	// Free symbol class table
 	HashTable_destroy(psr_ptr->symbol_class_table);
 
-	// Free rules
-	LinkedListIterator *itr_ptr = LinkedListIterator_new(psr_ptr->rules);
-	LinkedListIterator_move_to_first(itr_ptr);
-	Rule *rul_ptr;
-	while(1){
-		rul_ptr = LinkedListIterator_get_item(itr_ptr);
-		if(rul_ptr == NULL)	break;
-		Rule_destroy(rul_ptr);
-		LinkedListIterator_move_to_next(itr_ptr);
+	// Free rule_table and rules
+	for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
+		Rule *rul_ptr = HashTable_get( psr_ptr->rule_table, (void*)&(psr_ptr->variable_symbols[i]) );
+		while(rul_ptr != NULL){
+			Rule *next_rul_ptr = rul_ptr->next;
+			Rule_destroy(rul_ptr);
+			rul_ptr = next_rul_ptr;
+		}
 	}
-	LinkedListIterator_destroy(itr_ptr);
-	LinkedList_destroy(psr_ptr->rules);
+	HashTable_destroy(psr_ptr->rule_table);
 
 	// Free nullable set
 	BitSet_destroy(psr_ptr->nullable_set);
@@ -164,6 +167,7 @@ static Rule *Rule_new(int variable_symbol, int *expansion_symbols, int len_expan
 	rul_ptr->expansion_symbols = malloc( sizeof(int) * len_expansion_symbols );
 	memcpy( rul_ptr->expansion_symbols, expansion_symbols, sizeof(int) * len_expansion_symbols );
 	rul_ptr->len_expansion_symbols = len_expansion_symbols;
+	rul_ptr->next = NULL;
 
 	return rul_ptr;
 }
@@ -179,8 +183,22 @@ static void Rule_destroy(Rule *rul_ptr){
 //////////////////////
 
 void ParserLL1_add_rule(ParserLL1 *psr_ptr, int variable_symbol, int *expansion_symbols, int len_expansion_symbols){
-	Rule *rul_ptr = Rule_new(variable_symbol, expansion_symbols, len_expansion_symbols);
-	LinkedList_pushback(psr_ptr->rules, rul_ptr);
+	Rule *new_rul_ptr = Rule_new(variable_symbol, expansion_symbols, len_expansion_symbols);
+	Rule *prev_rul_ptr = HashTable_get(psr_ptr->rule_table, (void*) &(new_rul_ptr->variable_symbol) );
+
+	if(prev_rul_ptr == NULL){
+		// Need to add rule, no rule with same lhs exists. Use the key which
+		// exists within the rule, as it will exist outside this function's
+		// scope
+		new_rul_ptr->next = NULL;
+		HashTable_add(psr_ptr->rule_table, (void*) &(new_rul_ptr->variable_symbol), (void*) new_rul_ptr);
+	}
+
+	else{
+		// Need to add rule to already existing rule list
+		new_rul_ptr->next = prev_rul_ptr;
+		HashTable_set(psr_ptr->rule_table, (void*) &(new_rul_ptr->variable_symbol), (void*) new_rul_ptr);
+	}
 }
 
 static int calculate_nullable_set(ParserLL1 *psr_ptr){
@@ -193,11 +211,9 @@ static int calculate_nullable_set(ParserLL1 *psr_ptr){
 	BitSet_set_bit(psr_ptr->nullable_set, psr_ptr->empty_symbol);
 	BitSet_set_bit(done_set, psr_ptr->empty_symbol);
 
-	LinkedListIterator *itr_ptr = LinkedListIterator_new(psr_ptr->rules);
 
 	// TODO
 
-	LinkedListIterator_destroy(itr_ptr);
 	BitSet_destroy(working_set);
 	BitSet_destroy(done_set);
 
