@@ -120,10 +120,13 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	}
 
 
-	// Initialize rule list
+	// Create nullable set
+	psr_ptr->nullable_set = BitSet_new(psr_ptr->variable_symbols_min, psr_ptr->variable_symbols_max);
+
+	// Create rule list
 	psr_ptr->rules = LinkedList_new();
 
-	// Initialize stack
+	// Create stack
 	psr_ptr->stack = LinkedList_new();
 }
 
@@ -143,6 +146,9 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 	}
 	LinkedListIterator_destroy(itr_ptr);
 	LinkedList_destroy(psr_ptr->rules);
+
+	// Free nullable set
+	BitSet_destroy(psr_ptr->nullable_set);
 
 	// Free stack
 	free(psr_ptr->stack);
@@ -177,8 +183,29 @@ void ParserLL1_add_rule(ParserLL1 *psr_ptr, int variable_symbol, int *expansion_
 	LinkedList_pushback(psr_ptr->rules, rul_ptr);
 }
 
+static int calculate_nullable_set(ParserLL1 *psr_ptr){
+	// Set to mark variable symbols under calculation
+	BitSet *working_set = BitSet_clone(psr_ptr->nullable_set);
+	// Set to mark finished calculations
+	BitSet *done_set = BitSet_clone(psr_ptr->nullable_set);
+
+	// Add empty symbol to nullable set
+	BitSet_set_bit(psr_ptr->nullable_set, psr_ptr->empty_symbol);
+	BitSet_set_bit(done_set, psr_ptr->empty_symbol);
+
+	LinkedListIterator *itr_ptr = LinkedListIterator_new(psr_ptr->rules);
+
+	// TODO
+
+	LinkedListIterator_destroy(itr_ptr);
+	BitSet_destroy(working_set);
+	BitSet_destroy(done_set);
+
+	return 0;
+}
+
 Parser_InitializeResult_type ParserLL1_initialize_rules(ParserLL1 *psr_ptr){
-	
+	calculate_nullable_set(psr_ptr);
 }
 
 
