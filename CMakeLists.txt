@@ -23,3 +23,8 @@ if(NOT TARGET HashTable)
 	add_subdirectory(${CMAKE_SOURCE_DIR}/ext/HashTable ${CMAKE_SOURCE_DIR}/ext/HashTable/build/bin)
 endif(NOT TARGET HashTable)
 target_link_libraries(ParserLL1 HashTable)
+
+if(NOT TARGET BitSet)
+	add_subdirectory(${CMAKE_SOURCE_DIR}/ext/BitSet ${CMAKE_SOURCE_DIR}/ext/BitSet/build/bin)
+endif(NOT TARGET BitSet)
+target_link_libraries(ParserLL1 BitSet)

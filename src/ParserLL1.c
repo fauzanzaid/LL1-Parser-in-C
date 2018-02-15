@@ -4,6 +4,7 @@
 #include "ParserLL1.h"
 #include "LinkedList.h"
 #include "HashTable.h"
+#include "BitSet.h"
 
 
 ///////////////
