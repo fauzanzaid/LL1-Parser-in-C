@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "ParserLL1.h"
 #include "LinkedList.h"
@@ -25,9 +26,13 @@ typedef struct ParserLL1{
 
 	int *variable_symbols;
 	int len_variable_symbols;
+	// Minimum and maximum for BitSet
+	int variable_symbols_min, variable_symbols_max;
 
 	int *terminal_symbols;
 	int len_terminal_symbols;
+	// Minimum and maximum for BitSet
+	int terminal_symbols_min, terminal_symbols_max;
 
 	int start_symbol;
 	int empty_symbol;
@@ -38,6 +43,8 @@ typedef struct ParserLL1{
 	// Rules
 
 	LinkedList *rules;
+
+	BitSet *nullable_set;
 
 
 	// State
@@ -65,6 +72,8 @@ static int hash_function(void *key);
 
 static int key_compare(void *key1, void *key2);
 
+static int calculate_nullable_set(ParserLL1 *psr_ptr);
+
 
 ////////////////////////////////
 // Constructors & Destructors //
@@ -75,6 +84,7 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	// Allocate
 	ParserLL1 *psr_ptr = malloc( sizeof(ParserLL1) );
 
+
 	// Copy parameters
 	psr_ptr->variable_symbols = variable_symbols;
 	psr_ptr->len_variable_symbols = len_variable_symbols;
@@ -83,10 +93,32 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	psr_ptr->start_symbol = start_symbol;
 	psr_ptr->empty_symbol = empty_symbol;
 
-	// Initialize symbol class table
+
+	// Initialize symbol class table, calc minimum and maximum
+	psr_ptr->variable_symbols_min = INT_MAX;
+	psr_ptr->variable_symbols_max = INT_MIN;
+	psr_ptr->terminal_symbols_min = INT_MAX;
+	psr_ptr->terminal_symbols_max = INT_MIN;
 	psr_ptr->symbol_class_table = HashTable_new(len_variable_symbols + len_terminal_symbols, hash_function, key_compare);
-	for (int i = 0; i < len_variable_symbols; ++i)	HashTable_add(psr_ptr->symbol_class_table, (void*)&variable_symbols[i], (void*)&SYMBOL_CLASS_VARIABLE);
-	for (int i = 0; i < len_terminal_symbols; ++i)	HashTable_add(psr_ptr->symbol_class_table, (void*)&terminal_symbols[i], (void*)&SYMBOL_CLASS_TERMINAL);
+	
+	for (int i = 0; i < len_variable_symbols; ++i){
+		HashTable_add(psr_ptr->symbol_class_table, (void*)&variable_symbols[i], (void*)&SYMBOL_CLASS_VARIABLE);
+		
+		if(variable_symbols[i] < psr_ptr->variable_symbols_min)
+			psr_ptr->variable_symbols_min = variable_symbols[i];
+		if(variable_symbols[i] > psr_ptr->variable_symbols_max)
+			psr_ptr->variable_symbols_max = variable_symbols[i];
+	}
+
+	for (int i = 0; i < len_terminal_symbols; ++i){
+		HashTable_add(psr_ptr->symbol_class_table, (void*)&terminal_symbols[i], (void*)&SYMBOL_CLASS_TERMINAL);
+
+		if(terminal_symbols[i] < psr_ptr->terminal_symbols_min)
+			psr_ptr->terminal_symbols_min = terminal_symbols[i];
+		if(terminal_symbols[i] > psr_ptr->terminal_symbols_max)
+			psr_ptr->terminal_symbols_max = terminal_symbols[i];
+	}
+
 
 	// Initialize rule list
 	psr_ptr->rules = LinkedList_new();
