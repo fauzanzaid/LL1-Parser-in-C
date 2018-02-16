@@ -32,7 +32,7 @@ typedef struct ParserLL1 ParserLL1;
 /**
  * Allocates and initializes a ParserLL1 struct and returns a pointer to it.
  * Each symbol must be uniquely identified by an integer. Arrays must be kept
- * allocated by the user for the lifetime the ParserLL1 struct
+ * allocated by the user for the lifetime of the ParserLL1 struct
  * @param  variable_symbols     Array of non terminal or variably symbols
  * @param  len_variable_symbols Length of array
  * @param  terminal_symbols     Array of terminal symbols
@@ -40,7 +40,7 @@ typedef struct ParserLL1 ParserLL1;
  * @param  start_symbol         The start symbol
  * @return                      Pointer to ParserLL1 struct
  */
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol);
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol);
 
 /**
  * Deallocates all internally allocated memory to the struct

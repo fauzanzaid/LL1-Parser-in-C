@@ -36,6 +36,7 @@ typedef struct ParserLL1{
 
 	int start_symbol;
 	int empty_symbol;
+	int end_symbol;
 
 	HashTable *symbol_class_table;
 
@@ -88,7 +89,7 @@ static int calculate_follow_table(ParserLL1 *psr_ptr);
 // Constructors & Destructors //
 ////////////////////////////////
 
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol){
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol){
 
 	// Allocate
 	ParserLL1 *psr_ptr = malloc( sizeof(ParserLL1) );
@@ -101,6 +102,7 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	psr_ptr->len_terminal_symbols = len_terminal_symbols;
 	psr_ptr->start_symbol = start_symbol;
 	psr_ptr->empty_symbol = empty_symbol;
+	psr_ptr->end_symbol = end_symbol;
 
 
 	// Initialize symbol class table, calc minimum and maximum
@@ -329,6 +331,8 @@ static int calculate_first_table(ParserLL1 *psr_ptr){
 
 static int calculate_follow_table(ParserLL1 *psr_ptr){
 	// TODO add end of input to follow set of start symbol
+	BitSet *start_follow_set_ptr = HashTable_get(psr_ptr->follow_table, (void*) &(psr_ptr->start_symbol) );
+	BitSet_set_bit(start_follow_set_ptr, psr_ptr->end_symbol);
 
 	int flag_change = 1;
 	while(flag_change){
