@@ -81,6 +81,8 @@ static int key_compare(void *key1, void *key2);
 
 static int calculate_first_table(ParserLL1 *psr_ptr);
 
+static int calculate_follow_table(ParserLL1 *psr_ptr);
+
 
 ////////////////////////////////
 // Constructors & Destructors //
@@ -154,7 +156,7 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 
 	// Free rule_table and rules
 	for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
-		Rule *rul_ptr = HashTable_get( psr_ptr->rule_table, (void*)&(psr_ptr->variable_symbols[i]) );
+		Rule *rul_ptr = HashTable_get( psr_ptr->rule_table, (void*) &(psr_ptr->variable_symbols[i]) );
 		while(rul_ptr != NULL){
 			Rule *next_rul_ptr = rul_ptr->next;
 			Rule_destroy(rul_ptr);
@@ -169,8 +171,8 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 
 	// Free first and follow set for each table entry
 	for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
-		BitSet_destroy( (BitSet*) HashTable_get(psr_ptr->first_table, &(psr_ptr->variable_symbols[i]) ) );
-		BitSet_destroy( (BitSet*) HashTable_get(psr_ptr->follow_table, &(psr_ptr->variable_symbols[i]) ) );
+		BitSet_destroy( (BitSet*) HashTable_get(psr_ptr->first_table, (void*) &(psr_ptr->variable_symbols[i]) ) );
+		BitSet_destroy( (BitSet*) HashTable_get(psr_ptr->follow_table, (void*) &(psr_ptr->variable_symbols[i]) ) );
 	}
 
 	// Free first and follow set table
@@ -246,27 +248,27 @@ static int calculate_first_table(ParserLL1 *psr_ptr){
 				continue;
 
 
-			BitSet *var_first_set_ptr = HashTable_get(psr_ptr->first_table, &variable_symbol);
-			Rule *rul_ptr = HashTable_get(psr_ptr->rule_table, &variable_symbol );
-			
+			BitSet *var_first_set_ptr = HashTable_get(psr_ptr->first_table, (void*) &variable_symbol);
+			Rule *rul_ptr = HashTable_get(psr_ptr->rule_table, (void*) &variable_symbol );
+
 			while(rul_ptr != NULL){
 				// For each expansion of the variable symbol
-				
+
 				// printf("\t(%d)", rul_ptr->len_expansion_symbols);
 				for (int j = 0; j < rul_ptr->len_expansion_symbols; ++j){
 					// For each symbol in expansion
 					int expansion_symbol = rul_ptr->expansion_symbols[j];
 					// printf(" %d", expansion_symbol);
 
-					if( *(int*) HashTable_get(psr_ptr->symbol_class_table, &expansion_symbol) == SYMBOL_CLASS_TERMINAL ){
+					if( *(int*) HashTable_get(psr_ptr->symbol_class_table, (void*) &expansion_symbol) == SYMBOL_CLASS_TERMINAL ){
 						// Symbol is terminal
-						
+
 						if( BitSet_get_bit(var_first_set_ptr, expansion_symbol) == 0 ){
 							// Not in first set, add
 							BitSet_set_bit(var_first_set_ptr, expansion_symbol);
 							flag_change = 1;
 						}
-						
+
 						// This rule cannot be nullable, as it has a terminal symbol
 						flag_nullable = 0;
 
@@ -278,7 +280,7 @@ static int calculate_first_table(ParserLL1 *psr_ptr){
 						// Symbol is not a terminal
 
 						// Get first set of expansion symbol
-						BitSet *exp_first_set_ptr = HashTable_get(psr_ptr->first_table, &expansion_symbol);
+						BitSet *exp_first_set_ptr = HashTable_get(psr_ptr->first_table, (void*) &expansion_symbol);
 						// Temporary set to find changes
 						BitSet *tmp_set_ptr = BitSet_clone(exp_first_set_ptr);
 						BitSet_subtract(tmp_set_ptr, var_first_set_ptr);
@@ -322,13 +324,128 @@ static int calculate_first_table(ParserLL1 *psr_ptr){
 		}
 	}
 
-
-
 	return 0;
+}
+
+static int calculate_follow_table(ParserLL1 *psr_ptr){
+	// TODO add end of input to follow set of start symbol
+
+	int flag_change = 1;
+	while(flag_change){
+		flag_change = 0;
+
+		for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
+			// For each variable symbol
+			int variable_symbol = psr_ptr->variable_symbols[i];
+
+			// Get follow set of lhs
+			BitSet *var_follow_set_ptr = HashTable_get(psr_ptr->follow_table, (void*) &variable_symbol);
+
+			// No rules expand empty symbol
+			if(variable_symbol == psr_ptr->empty_symbol)
+				continue;
+
+			Rule *rul_ptr = HashTable_get(psr_ptr->rule_table, (void*) &variable_symbol );
+
+			while(rul_ptr != NULL){
+				// For each expansion of the variable symbol
+
+				// Flag to check if follow of lhs shoulf be included in the
+				// expansion symbol. Initialized to 1, as the last expansion symbol, if
+				// it is a non terminal, which will be iterated first,
+				// necessarily contains follow of lhs.
+				int flag_nullable = 1;
+
+				// Iterate in reverse, quicker in case of nullable expansion
+				// symbols
+				for (int j = rul_ptr->len_expansion_symbols - 1; j >= 0; --j){
+					// For each symbol in expansion
+					int expansion_symbol = rul_ptr->expansion_symbols[j];
+
+
+					if( *(int*) HashTable_get(psr_ptr->symbol_class_table, (void*) &expansion_symbol) == SYMBOL_CLASS_VARIABLE ){
+						// Symbol is not terminal
+
+						// Get follow set of expansion symbol
+						BitSet *exp_follow_set_ptr = HashTable_get(psr_ptr->follow_table, (void*) &expansion_symbol);
+
+						if(flag_nullable == 1){
+							// Add follow of lhs
+
+							// Temporary set to find changes
+							BitSet *tmp_set_ptr = BitSet_clone(var_follow_set_ptr);
+							BitSet_subtract(tmp_set_ptr, exp_follow_set_ptr);
+
+
+							if(BitSet_get_any(tmp_set_ptr) == 1){
+								// New terminals exist to be added to follow set
+
+								BitSet_or(exp_follow_set_ptr, var_follow_set_ptr);
+								flag_change = 1;
+							}
+
+							BitSet_destroy(tmp_set_ptr);
+						}
+
+						if( BitSet_get_bit(psr_ptr->nullable_set, expansion_symbol) == 0 ){
+							// expansion is no longer nullable
+							flag_nullable = 0;
+						}
+
+
+						if(j < rul_ptr->len_expansion_symbols - 1){
+							// Symbol is not the last in rule, can add first set of next symbol
+							int next_expansion_symbol = rul_ptr->expansion_symbols[j+1];
+
+							if( *(int*) HashTable_get(psr_ptr->symbol_class_table, (void*) &next_expansion_symbol) == SYMBOL_CLASS_TERMINAL ){
+								// Add the terminal symbol
+
+								if( BitSet_get_bit(exp_follow_set_ptr, next_expansion_symbol) == 0 ){
+									// Not yet set
+									BitSet_set_bit(exp_follow_set_ptr, next_expansion_symbol);
+									flag_change = 1;
+								}
+							}
+
+							else{
+								// Add first set of following symbol
+
+								BitSet *next_exp_first_set_ptr = HashTable_get(psr_ptr->first_table, (void*) &next_expansion_symbol);
+
+								// Temporary set to find changes
+								BitSet *tmp_set_ptr = BitSet_clone(next_exp_first_set_ptr);
+								BitSet_subtract(tmp_set_ptr, exp_follow_set_ptr);
+
+								if(BitSet_get_any(tmp_set_ptr) == 1){
+									// New terminals exist to be added to follow set
+									BitSet_or(exp_follow_set_ptr, next_exp_first_set_ptr);
+									flag_change = 1;
+								}
+
+								BitSet_destroy(tmp_set_ptr);
+							}
+						}
+					}
+
+					else{
+						// Terminal symbol, no follow set
+
+						// Set this to 0 as it is no longer possibe to have a
+						// null expansion
+						flag_nullable = 0;
+					}
+
+				}
+
+				rul_ptr = rul_ptr->next;
+			}
+		}
+	}
 }
 
 Parser_InitializeResult_type ParserLL1_initialize_rules(ParserLL1 *psr_ptr){
 	calculate_first_table(psr_ptr);
+	calculate_follow_table(psr_ptr);
 }
 
 
