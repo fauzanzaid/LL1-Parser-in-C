@@ -345,9 +345,6 @@ static int calculate_follow_table(ParserLL1 *psr_ptr){
 			// Get follow set of lhs
 			BitSet *var_follow_set_ptr = HashTable_get(psr_ptr->follow_table, (void*) &variable_symbol);
 
-			// No rules expand empty symbol
-			if(variable_symbol == psr_ptr->empty_symbol)
-				continue;
 
 			Rule *rul_ptr = HashTable_get(psr_ptr->rule_table, (void*) &variable_symbol );
 
@@ -366,6 +363,9 @@ static int calculate_follow_table(ParserLL1 *psr_ptr){
 					// For each symbol in expansion
 					int expansion_symbol = rul_ptr->expansion_symbols[j];
 
+					// No follow set of empty symbol
+					if(expansion_symbol == psr_ptr->empty_symbol)
+						continue;
 
 					if( *(int*) HashTable_get(psr_ptr->symbol_class_table, (void*) &expansion_symbol) == SYMBOL_CLASS_VARIABLE ){
 						// Symbol is not terminal
