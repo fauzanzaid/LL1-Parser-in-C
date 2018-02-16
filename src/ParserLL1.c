@@ -45,10 +45,11 @@ typedef struct ParserLL1{
 
 	HashTable *rule_table;
 
-	BitSet *nullable_set;
 	// First set table does not capture epsilon reachability 
+	BitSet *nullable_set;
 	HashTable *first_table;
 	HashTable *follow_table;
+	HashTable *parse_table;
 
 	// State
 
@@ -83,6 +84,8 @@ static int key_compare(void *key1, void *key2);
 static int calculate_first_table(ParserLL1 *psr_ptr);
 
 static int calculate_follow_table(ParserLL1 *psr_ptr);
+
+static int populate_parse_table(ParserLL1 *psr_ptr);
 
 
 ////////////////////////////////
@@ -131,6 +134,9 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	}
 
 
+	// Create rule table
+	psr_ptr->rule_table = HashTable_new(len_variable_symbols, hash_function, key_compare);
+
 	// Create nullable set
 	psr_ptr->nullable_set = BitSet_new(psr_ptr->variable_symbols_min, psr_ptr->variable_symbols_max);
 
@@ -144,9 +150,13 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 		HashTable_add(psr_ptr->follow_table, &(psr_ptr->variable_symbols[i]), (void*) BitSet_new(psr_ptr->terminal_symbols_min, psr_ptr->terminal_symbols_max) );
 	}
 
+	// Create parse table
+	psr_ptr->parse_table = HashTable_new(len_variable_symbols, hash_function, key_compare);
 
-	// Create rule table
-	psr_ptr->rule_table = HashTable_new(len_variable_symbols, hash_function, key_compare);
+	// Create row entry table for each variable symbol
+	for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
+		HashTable_add(psr_ptr->parse_table, &(psr_ptr->variable_symbols[i]), HashTable_new(psr_ptr->len_terminal_symbols, hash_function, key_compare));
+	}
 
 	// Create stack
 	psr_ptr->stack = LinkedList_new();
@@ -170,7 +180,6 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 	// Free nullable set
 	BitSet_destroy(psr_ptr->nullable_set);
 
-
 	// Free first and follow set for each table entry
 	for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
 		BitSet_destroy( (BitSet*) HashTable_get(psr_ptr->first_table, (void*) &(psr_ptr->variable_symbols[i]) ) );
@@ -180,6 +189,15 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 	// Free first and follow set table
 	HashTable_destroy(psr_ptr->first_table);
 	HashTable_destroy(psr_ptr->follow_table);
+
+
+	// Free row entry table for each variable symbol
+	for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
+		HashTable_destroy( HashTable_get( psr_ptr->parse_table, &(psr_ptr->variable_symbols[i]) ) );
+	}
+
+	// Free parse table
+	HashTable_destroy(psr_ptr->parse_table);
 
 	// Free stack
 	free(psr_ptr->stack);
@@ -447,9 +465,64 @@ static int calculate_follow_table(ParserLL1 *psr_ptr){
 	}
 }
 
+static int populate_parse_table(ParserLL1 *psr_ptr){
+	for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
+		// For each variable
+
+		int variable_symbol = psr_ptr->variable_symbols[i];
+		HashTable* var_row_tbl_ptr = HashTable_get(psr_ptr->parse_table, &variable_symbol);
+
+		Rule *rul_ptr = HashTable_get(psr_ptr->rule_table, (void*) &variable_symbol );
+
+		while(rul_ptr != NULL){
+			// For each expansion of the variable symbol
+
+			int expansion_symbol = rul_ptr->expansion_symbols[0];
+			// Need pointer for hashtable key
+			int *expansion_symbol_ptr = &(rul_ptr->expansion_symbols[0]);
+
+			if( *(int*) HashTable_get(psr_ptr->symbol_class_table, expansion_symbol_ptr) == SYMBOL_CLASS_TERMINAL ){
+				// Symbol is terminal. First set is itself
+				HashTable_add(var_row_tbl_ptr, expansion_symbol_ptr, rul_ptr);
+			}
+
+			// No need to consider empty symbol
+			else if(expansion_symbol != psr_ptr->empty_symbol){
+				// Symbol is not terminal. Need to add rule for each symbol in
+				// first set
+
+				BitSet *exp_first_set_ptr = HashTable_get(psr_ptr->first_table, expansion_symbol_ptr);
+
+				for (int j = 0; j < psr_ptr->len_terminal_symbols; ++j){
+					if( BitSet_get_bit(exp_first_set_ptr, psr_ptr->terminal_symbols[j]) == 1 ){
+						HashTable_add(var_row_tbl_ptr, &(psr_ptr->terminal_symbols[j]), rul_ptr);
+					}
+				}
+
+
+				if( BitSet_get_bit(psr_ptr->nullable_set, expansion_symbol) == 1 ){
+					// Need to add rule for each symbol n follow set as the
+					// symbol is nullable
+
+					BitSet *exp_follow_set_ptr = HashTable_get(psr_ptr->follow_table, expansion_symbol_ptr);
+
+					for (int j = 0; j < psr_ptr->len_terminal_symbols; ++j){
+						if( BitSet_get_bit(exp_follow_set_ptr, psr_ptr->terminal_symbols[j]) == 1 ){
+							HashTable_add(var_row_tbl_ptr, &(psr_ptr->terminal_symbols[j]), rul_ptr);
+						}
+					}
+				}
+			}
+
+			rul_ptr = rul_ptr->next;
+		}
+	}
+}
+
 Parser_InitializeResult_type ParserLL1_initialize_rules(ParserLL1 *psr_ptr){
 	calculate_first_table(psr_ptr);
 	calculate_follow_table(psr_ptr);
+	populate_parse_table(psr_ptr);
 }
 
 
