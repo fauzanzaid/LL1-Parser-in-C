@@ -81,11 +81,11 @@ static int hash_function(void *key);
 
 static int key_compare(void *key1, void *key2);
 
-static int calculate_first_table(ParserLL1 *psr_ptr);
+static void calculate_first_table(ParserLL1 *psr_ptr);
 
-static int calculate_follow_table(ParserLL1 *psr_ptr);
+static void calculate_follow_table(ParserLL1 *psr_ptr);
 
-static int populate_parse_table(ParserLL1 *psr_ptr);
+static void populate_parse_table(ParserLL1 *psr_ptr);
 
 
 ////////////////////////////////
@@ -247,7 +247,7 @@ void ParserLL1_add_rule(ParserLL1 *psr_ptr, int variable_symbol, int *expansion_
 	}
 }
 
-static int calculate_first_table(ParserLL1 *psr_ptr){
+static void calculate_first_table(ParserLL1 *psr_ptr){
 
 	// Add empty symbol to nullable set
 	BitSet_set_bit(psr_ptr->nullable_set, psr_ptr->empty_symbol);
@@ -343,11 +343,9 @@ static int calculate_first_table(ParserLL1 *psr_ptr){
 			}
 		}
 	}
-
-	return 0;
 }
 
-static int calculate_follow_table(ParserLL1 *psr_ptr){
+static void calculate_follow_table(ParserLL1 *psr_ptr){
 	// TODO add end of input to follow set of start symbol
 	BitSet *start_follow_set_ptr = HashTable_get(psr_ptr->follow_table, (void*) &(psr_ptr->start_symbol) );
 	BitSet_set_bit(start_follow_set_ptr, psr_ptr->end_symbol);
@@ -465,7 +463,7 @@ static int calculate_follow_table(ParserLL1 *psr_ptr){
 	}
 }
 
-static int populate_parse_table(ParserLL1 *psr_ptr){
+static void populate_parse_table(ParserLL1 *psr_ptr){
 	for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
 		// For each variable
 
@@ -519,7 +517,7 @@ static int populate_parse_table(ParserLL1 *psr_ptr){
 	}
 }
 
-Parser_InitializeResult_type ParserLL1_initialize_rules(ParserLL1 *psr_ptr){
+void ParserLL1_initialize_rules(ParserLL1 *psr_ptr){
 	calculate_first_table(psr_ptr);
 	calculate_follow_table(psr_ptr);
 	populate_parse_table(psr_ptr);

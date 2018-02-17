@@ -7,12 +7,6 @@
 ///////////
 
 typedef enum{
-	PARSER_INITIALIZE_RESULT_SUCCESS,
-	PARSER_INITIALIZE_RESULT_FAIL_FIRST = -1,
-	PARSER_INITIALIZE_RESULT_FAIL_FOLLOW = -2
-} Parser_InitializeResult_type;
-
-typedef enum{
 	PARSER_STEP_RESULT_SUCCESS,
 	PARSER_STEP_RESULT_FAIL = -1,
 } Parser_StepResult_type;
@@ -74,7 +68,7 @@ void ParserLL1_add_rule(ParserLL1 *psr_ptr, int variable_symbol, int *expansion_
  * @retval PARSER_INITIALIZE_RESULT_FAIL_FIRST  Failed to calculate first sets
  * @retval PARSER_INITIALIZE_RESULT_FAIL_FOLLOW Failed to calculate follow sets 
  */
-Parser_InitializeResult_type ParserLL1_initialize_rules(ParserLL1 *psr_ptr);
+void ParserLL1_initialize_rules(ParserLL1 *psr_ptr);
 
 
 /////////
