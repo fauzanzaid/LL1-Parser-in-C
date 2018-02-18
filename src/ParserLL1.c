@@ -34,11 +34,15 @@ typedef struct ParserLL1{
 	// Minimum and maximum for BitSet
 	int terminal_symbols_min, terminal_symbols_max;
 
+	// Minimum and maximum of all symbols
+	int symbols_min, symbols_max;
+
 	int start_symbol;
 	int empty_symbol;
 	int end_symbol;
 
-	HashTable *symbol_class_table;
+	// Set for terminals, clear for variables
+	BitSet *symbol_class_set;
 
 
 	// Rules
@@ -108,16 +112,13 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	psr_ptr->end_symbol = end_symbol;
 
 
-	// Initialize symbol class table, calc minimum and maximum
+	// Calc minimum and maximum
 	psr_ptr->variable_symbols_min = INT_MAX;
 	psr_ptr->variable_symbols_max = INT_MIN;
 	psr_ptr->terminal_symbols_min = INT_MAX;
 	psr_ptr->terminal_symbols_max = INT_MIN;
-	psr_ptr->symbol_class_table = HashTable_new(len_variable_symbols + len_terminal_symbols, hash_function, key_compare);
-	
+
 	for (int i = 0; i < len_variable_symbols; ++i){
-		HashTable_add(psr_ptr->symbol_class_table, (void*)&variable_symbols[i], (void*)&SYMBOL_CLASS_VARIABLE);
-		
 		if(variable_symbols[i] < psr_ptr->variable_symbols_min)
 			psr_ptr->variable_symbols_min = variable_symbols[i];
 		if(variable_symbols[i] > psr_ptr->variable_symbols_max)
@@ -125,14 +126,25 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	}
 
 	for (int i = 0; i < len_terminal_symbols; ++i){
-		HashTable_add(psr_ptr->symbol_class_table, (void*)&terminal_symbols[i], (void*)&SYMBOL_CLASS_TERMINAL);
-
 		if(terminal_symbols[i] < psr_ptr->terminal_symbols_min)
 			psr_ptr->terminal_symbols_min = terminal_symbols[i];
 		if(terminal_symbols[i] > psr_ptr->terminal_symbols_max)
 			psr_ptr->terminal_symbols_max = terminal_symbols[i];
 	}
 
+	if(psr_ptr->terminal_symbols_min < psr_ptr->variable_symbols_min)
+		psr_ptr->symbols_min = psr_ptr->terminal_symbols_min;
+	else
+		psr_ptr->symbols_min = psr_ptr->variable_symbols_min;
+
+	if(psr_ptr->terminal_symbols_max > psr_ptr->variable_symbols_max)
+		psr_ptr->symbols_max = psr_ptr->terminal_symbols_max;
+	else
+		psr_ptr->symbols_max = psr_ptr->variable_symbols_max;
+
+	psr_ptr->symbol_class_set = BitSet_new(psr_ptr->symbols_min, psr_ptr->symbols_max);
+	for (int i = 0; i < len_terminal_symbols; ++i)
+		BitSet_set_bit(psr_ptr->symbol_class_set, psr_ptr->terminal_symbols[i]);
 
 	// Create rule table
 	psr_ptr->rule_table = HashTable_new(len_variable_symbols, hash_function, key_compare);
@@ -163,8 +175,8 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 }
 
 void ParserLL1_destroy(ParserLL1 *psr_ptr){
-	// Free symbol class table
-	HashTable_destroy(psr_ptr->symbol_class_table);
+	// Free symbol class set
+	BitSet_destroy(psr_ptr->symbol_class_set);
 
 	// Free rule_table and rules
 	for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
@@ -280,7 +292,7 @@ static void calculate_first_table(ParserLL1 *psr_ptr){
 					int expansion_symbol = rul_ptr->expansion_symbols[j];
 					// printf(" %d", expansion_symbol);
 
-					if( *(int*) HashTable_get(psr_ptr->symbol_class_table, (void*) &expansion_symbol) == SYMBOL_CLASS_TERMINAL ){
+					if( BitSet_get_bit(psr_ptr->symbol_class_set, expansion_symbol) == 1 ){
 						// Symbol is terminal
 
 						if( BitSet_get_bit(var_first_set_ptr, expansion_symbol) == 0 ){
@@ -383,7 +395,7 @@ static void calculate_follow_table(ParserLL1 *psr_ptr){
 					if(expansion_symbol == psr_ptr->empty_symbol)
 						continue;
 
-					if( *(int*) HashTable_get(psr_ptr->symbol_class_table, (void*) &expansion_symbol) == SYMBOL_CLASS_VARIABLE ){
+					if( BitSet_get_bit(psr_ptr->symbol_class_set, expansion_symbol) == 0 ){
 						// Symbol is not terminal
 
 						// Get follow set of expansion symbol
@@ -417,7 +429,7 @@ static void calculate_follow_table(ParserLL1 *psr_ptr){
 							// Symbol is not the last in rule, can add first set of next symbol
 							int next_expansion_symbol = rul_ptr->expansion_symbols[j+1];
 
-							if( *(int*) HashTable_get(psr_ptr->symbol_class_table, (void*) &next_expansion_symbol) == SYMBOL_CLASS_TERMINAL ){
+							if( BitSet_get_bit(psr_ptr->symbol_class_set, next_expansion_symbol) == 1 ){
 								// Add the terminal symbol
 
 								if( BitSet_get_bit(exp_follow_set_ptr, next_expansion_symbol) == 0 ){
@@ -479,7 +491,7 @@ static void populate_parse_table(ParserLL1 *psr_ptr){
 			// Need pointer for hashtable key
 			int *expansion_symbol_ptr = &(rul_ptr->expansion_symbols[0]);
 
-			if( *(int*) HashTable_get(psr_ptr->symbol_class_table, expansion_symbol_ptr) == SYMBOL_CLASS_TERMINAL ){
+			if( BitSet_get_bit(psr_ptr->symbol_class_set, expansion_symbol) == 1 ){
 				// Symbol is terminal. First set is itself
 				HashTable_add(var_row_tbl_ptr, expansion_symbol_ptr, rul_ptr);
 			}
