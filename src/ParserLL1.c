@@ -3,10 +3,12 @@
 #include <limits.h>
 
 #include "ParserLL1.h"
+#include "ParseTree.h"
 #include "LinkedList.h"
 #include "HashTable.h"
 #include "BitSet.h"
 
+#include <stdio.h>
 
 ///////////////
 // Constants //
@@ -55,9 +57,10 @@ typedef struct ParserLL1{
 	HashTable *follow_table;
 	HashTable *parse_table;
 
-	// State
+	// Parse tree
 
 	LinkedList *stack;
+	ParseTree_Node *tree;
 
 }ParserLL1;
 
@@ -173,6 +176,14 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 
 	// Create stack
 	psr_ptr->stack = LinkedList_new();
+
+	// Create Parse Tree. This is not freed when parser is destroyed, must be freed by the caller
+	// Add end symbol and starting symbol to tree and stack
+	psr_ptr->tree = ParseTree_Node_new(psr_ptr->end_symbol, NULL);
+	LinkedList_push(psr_ptr->stack, psr_ptr->tree);
+	LinkedList_push(psr_ptr->stack, ParseTree_Node_add_child_left_end(psr_ptr->tree, psr_ptr->start_symbol, NULL) );
+
+	return psr_ptr;
 }
 
 void ParserLL1_destroy(ParserLL1 *psr_ptr){
@@ -213,7 +224,10 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 	HashTable_destroy(psr_ptr->parse_table);
 
 	// Free stack
-	free(psr_ptr->stack);
+	LinkedList_destroy(psr_ptr->stack);
+
+	// Free parse tree
+	ParseTree_Node_destroy(psr_ptr->tree);
 
 	// Free parser
 	free(psr_ptr);
@@ -272,7 +286,6 @@ static void calculate_first_table(ParserLL1 *psr_ptr){
 		for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
 			// For each variable symbol
 			int variable_symbol = psr_ptr->variable_symbols[i];
-			// printf("%d\n", variable_symbol);
 			// Will be set to 1 if variable symbol is nullable, else 0
 			int flag_nullable;
 
@@ -287,11 +300,9 @@ static void calculate_first_table(ParserLL1 *psr_ptr){
 			while(rul_ptr != NULL){
 				// For each expansion of the variable symbol
 
-				// printf("\t(%d)", rul_ptr->len_expansion_symbols);
 				for (int j = 0; j < rul_ptr->len_expansion_symbols; ++j){
 					// For each symbol in expansion
 					int expansion_symbol = rul_ptr->expansion_symbols[j];
-					// printf(" %d", expansion_symbol);
 
 					if( BitSet_get_bit(psr_ptr->symbol_class_set, expansion_symbol) == 1 ){
 						// Symbol is terminal
@@ -340,7 +351,6 @@ static void calculate_first_table(ParserLL1 *psr_ptr){
 					}
 
 				}
-				// printf("\n");
 
 				if(flag_nullable == 1){
 					// The variable symbol is nullable
