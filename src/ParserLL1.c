@@ -554,8 +554,12 @@ void ParserLL1_initialize_rules(ParserLL1 *psr_ptr){
 // Run //
 /////////
 
-Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, int symbol){
+Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 	
+}
+
+ParseTree *ParserLL1_get_parse_tree(ParserLL1 *psr_ptr){
+
 }
 
 

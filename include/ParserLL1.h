@@ -2,12 +2,14 @@
 #define INCLUDE_GUARD_FC41E67B8AC9429A8C4C6898EFB5E4FE
 
 #include "Token.h"
+#include "ParseTree.h"
 
 ///////////
 // Types //
 ///////////
 
 typedef enum{
+	PARSER_STEP_RESULT_MORE_INPUT,
 	PARSER_STEP_RESULT_SUCCESS,
 	PARSER_STEP_RESULT_FAIL = -1,
 } Parser_StepResult_type;
@@ -66,10 +68,6 @@ void ParserLL1_add_rule(ParserLL1 *psr_ptr, int variable_symbol, int *expansion_
  * Calculates the first and follow sets for each symbol and initializes the
  * parse table
  * @param psr_ptr Pointer to ParserLL1 struct
- * @return        Status
- * @retval PARSER_INITIALIZE_RESULT_SUCCESS     Initialization successful
- * @retval PARSER_INITIALIZE_RESULT_FAIL_FIRST  Failed to calculate first sets
- * @retval PARSER_INITIALIZE_RESULT_FAIL_FOLLOW Failed to calculate follow sets 
  */
 void ParserLL1_initialize_rules(ParserLL1 *psr_ptr);
 
@@ -80,13 +78,23 @@ void ParserLL1_initialize_rules(ParserLL1 *psr_ptr);
 
 /**
  * Attempts to process @p symbol if possible
- * @param  psr_ptr Pointer to ParserLL1 struct
- * @param  symbol  Input symbol to process
- * @return         Status
- * @retval PARSER_STEP_RESULT_SUCCESS Processing successful
- * @retval PARSER_STEP_RESULT_FAIL Processing failed
+ * @param  psr_ptr  Pointer to ParserLL1 struct
+ * @param  tkn_ptr  Input token to process
+ * @return          Status
+ * @retval PARSER_STEP_RESULT_MORE_INPUT Input more tokens
+ * @retval PARSER_STEP_RESULT_SUCCESS    Parsing complete, parse tree completely
+ * constructed
+ * @retval PARSER_STEP_RESULT_FAIL       Parsing failed
  */
-Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, int symbol);
+Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr);
 
+/**
+ * Returns a pointer to the internally constructed parse tree, if it has been
+ * completely constructed. Otherwise returns NULL. The tree will be freed when
+ * the corresponding ParserLL1 struct is freed
+ * @param  psr_ptr Pointer to ParserLL1 struct
+ * @return         Pointer to ParseTree struct
+ */
+ParseTree *ParserLL1_get_parse_tree(ParserLL1 *psr_ptr);
 
 #endif
