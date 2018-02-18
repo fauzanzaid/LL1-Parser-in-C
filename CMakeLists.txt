@@ -28,3 +28,8 @@ if(NOT TARGET BitSet)
 	add_subdirectory(${CMAKE_SOURCE_DIR}/ext/BitSet ${CMAKE_SOURCE_DIR}/ext/BitSet/build/bin)
 endif(NOT TARGET BitSet)
 target_link_libraries(ParserLL1 BitSet)
+
+if(NOT TARGET ParseTree)
+	add_subdirectory(${CMAKE_SOURCE_DIR}/ext/ParseTree ${CMAKE_SOURCE_DIR}/ext/ParseTree/build/bin)
+endif(NOT TARGET ParseTree)
+target_link_libraries(ParserLL1 ParseTree)
