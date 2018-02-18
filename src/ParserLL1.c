@@ -183,9 +183,9 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 
 	// Create Parse Tree. This is not freed when parser is destroyed, must be freed by the caller
 	// Add end symbol and starting symbol to tree and stack
-	psr_ptr->tree = ParseTree_Node_new(psr_ptr->end_symbol, NULL);
+	psr_ptr->tree = ParseTree_Node_new(psr_ptr->start_symbol, NULL);
+	LinkedList_push(psr_ptr->stack, ParseTree_Node_new(psr_ptr->end_symbol, NULL) );
 	LinkedList_push(psr_ptr->stack, psr_ptr->tree);
-	LinkedList_push(psr_ptr->stack, ParseTree_Node_add_child_left_end(psr_ptr->tree, psr_ptr->start_symbol, NULL) );
 
 	return psr_ptr;
 }
@@ -495,6 +495,7 @@ static void populate_parse_table(ParserLL1 *psr_ptr){
 		// For each variable
 
 		int variable_symbol = psr_ptr->variable_symbols[i];
+		int *variable_symbol_ptr = &(psr_ptr->variable_symbols[i]);
 		HashTable* var_row_tbl_ptr = HashTable_get(psr_ptr->parse_table, &variable_symbol);
 
 		Rule *rul_ptr = HashTable_get(psr_ptr->rule_table, (void*) &variable_symbol );
@@ -509,10 +510,10 @@ static void populate_parse_table(ParserLL1 *psr_ptr){
 			if( BitSet_get_bit(psr_ptr->symbol_class_set, expansion_symbol) == 1 ){
 				// Symbol is terminal. First set is itself
 				HashTable_add(var_row_tbl_ptr, expansion_symbol_ptr, rul_ptr);
+				// printf("populate_parse_table : \t\t\t\t\t[%d,%d]\n", variable_symbol, expansion_symbol);
 			}
 
-			// No need to consider empty symbol
-			else if(expansion_symbol != psr_ptr->empty_symbol){
+			else{
 				// Symbol is not terminal. Need to add rule for each symbol in
 				// first set
 
@@ -521,19 +522,31 @@ static void populate_parse_table(ParserLL1 *psr_ptr){
 				for (int j = 0; j < psr_ptr->len_terminal_symbols; ++j){
 					if( BitSet_get_bit(exp_first_set_ptr, psr_ptr->terminal_symbols[j]) == 1 ){
 						HashTable_add(var_row_tbl_ptr, &(psr_ptr->terminal_symbols[j]), rul_ptr);
+						// printf("populate_parse_table : \t\t\t\t\t[%d,%d]\n", variable_symbol, psr_ptr->terminal_symbols[j]);
 					}
 				}
 
+				// Check if rule is nullable
+				int flag_nullable = 1;
+				for (int j = 0; j < rul_ptr->len_expansion_symbols; ++j){
+					if( BitSet_get_bit(psr_ptr->nullable_set, rul_ptr->expansion_symbols[j]) == 0 ){
+						// Not nullable
+						flag_nullable = 0;
+						break;
+					}
+				}
 
-				if( BitSet_get_bit(psr_ptr->nullable_set, expansion_symbol) == 1 ){
-					// Need to add rule for each symbol n follow set as the
-					// symbol is nullable
+				// Add if rule is nullable
+				if( flag_nullable == 1 ){
+					// Need to add rule for each symbol in follow set as the
+					// rule is nullable
 
-					BitSet *exp_follow_set_ptr = HashTable_get(psr_ptr->follow_table, expansion_symbol_ptr);
+					BitSet *exp_follow_set_ptr = HashTable_get(psr_ptr->follow_table, variable_symbol_ptr);
 
 					for (int j = 0; j < psr_ptr->len_terminal_symbols; ++j){
 						if( BitSet_get_bit(exp_follow_set_ptr, psr_ptr->terminal_symbols[j]) == 1 ){
 							HashTable_add(var_row_tbl_ptr, &(psr_ptr->terminal_symbols[j]), rul_ptr);
+							// printf("populate_parse_table : \t\t\t\t\t[%d,%d]\n", variable_symbol, psr_ptr->terminal_symbols[j]);
 						}
 					}
 				}
@@ -574,30 +587,35 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 		ParseTree_Node *top_node_ptr = LinkedList_peek(psr_ptr->stack);
 		int top_symbol = top_node_ptr->symbol;
 
+		// printf("top=%d\t", top_symbol);
+
 		if( BitSet_get_bit(psr_ptr->symbol_class_set, top_symbol) == 1 ){
 			// Top of the stack is a terminal
 
 			if(lookahead_symbol == top_symbol){
 				// Match
+				// printf("Match\n");
 				top_node_ptr->tkn_ptr = tkn_ptr;
 
-				// No need to free popped node, already exists in tree
-				LinkedList_pop(psr_ptr->stack);
+				if(top_symbol == psr_ptr->end_symbol){
+					// End of stack reached, parsing over
 
-				if(LinkedList_get_size == 0){
-					// Stack exhausted, parsing over
+					// Need to free end node, as it does not belong to tree
+					ParseTree_Node_destroy( LinkedList_pop(psr_ptr->stack) );
 					return PARSER_STEP_RESULT_SUCCESS;
 				}
+
 				else{
 					// Stack not empty, require more input
+
+					// No need to free popped node, already exists in tree
+					LinkedList_pop(psr_ptr->stack);
 					return PARSER_STEP_RESULT_MORE_INPUT;
 				}
-
 			}
 
 			else{
 				// Parsing error, lookahead does not match top of stack
-
 				// Free token, as not added to parse tree, will be lost
 				// otherwise
 				Token_destroy(tkn_ptr);
