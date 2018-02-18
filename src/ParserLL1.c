@@ -227,6 +227,11 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 	// Free parse table
 	HashTable_destroy(psr_ptr->parse_table);
 
+	// Check if end symbol exists at the end of stack, free it
+	if(LinkedList_peekback(psr_ptr->stack) != NULL){
+		ParseTree_Node_destroy(LinkedList_peekback(psr_ptr->stack));
+	}
+
 	// Free stack
 	LinkedList_destroy(psr_ptr->stack);
 
