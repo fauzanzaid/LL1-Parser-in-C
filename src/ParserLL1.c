@@ -59,6 +59,7 @@ typedef struct ParserLL1{
 
 	// Parse tree
 
+	int (*token_to_symbol)(Token *);
 	LinkedList *stack;
 	ParseTree_Node *tree;
 
@@ -99,7 +100,7 @@ static void populate_parse_table(ParserLL1 *psr_ptr);
 // Constructors & Destructors //
 ////////////////////////////////
 
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol){
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int (*token_to_symbol)(Token *)){
 
 	// Allocate
 	ParserLL1 *psr_ptr = malloc( sizeof(ParserLL1) );
@@ -113,6 +114,8 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	psr_ptr->start_symbol = start_symbol;
 	psr_ptr->empty_symbol = empty_symbol;
 	psr_ptr->end_symbol = end_symbol;
+
+	psr_ptr->token_to_symbol = token_to_symbol;
 
 
 	// Calc minimum and maximum

@@ -1,6 +1,7 @@
 #ifndef INCLUDE_GUARD_FC41E67B8AC9429A8C4C6898EFB5E4FE
 #define INCLUDE_GUARD_FC41E67B8AC9429A8C4C6898EFB5E4FE
 
+#include "Token.h"
 
 ///////////
 // Types //
@@ -32,9 +33,11 @@ typedef struct ParserLL1 ParserLL1;
  * @param  terminal_symbols     Array of terminal symbols
  * @param  len_terminal_symbols Length of array
  * @param  start_symbol         The start symbol
+ * @param  token_to_symbol      A user defined function that takes a terminal
+ * token as parameter and outputs the corresponding terminal symbol
  * @return                      Pointer to ParserLL1 struct
  */
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol);
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int (*token_to_symbol)(Token *));
 
 /**
  * Deallocates all internally allocated memory to the struct
