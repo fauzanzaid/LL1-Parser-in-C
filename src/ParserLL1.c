@@ -4,6 +4,7 @@
 
 #include "ParserLL1.h"
 #include "ParseTree.h"
+#include "Token.h"
 #include "LinkedList.h"
 #include "HashTable.h"
 #include "BitSet.h"
@@ -555,11 +556,104 @@ void ParserLL1_initialize_rules(ParserLL1 *psr_ptr){
 /////////
 
 Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
-	
+	int lookahead_symbol = psr_ptr->token_to_symbol(tkn_ptr);
+
+	// Check if symbol is valid terminal
+	if(lookahead_symbol < psr_ptr->terminal_symbols_min || lookahead_symbol > psr_ptr->terminal_symbols_max){
+
+		// Free token, as not added to parse tree, will be lost
+		// otherwise
+		Token_destroy(tkn_ptr);
+
+		return PARSER_STEP_RESULT_UNKNOWN_INPUT;
+	}
+
+	while(1){
+		// Loop until top of the stack is a terminal
+
+		ParseTree_Node *top_node_ptr = LinkedList_peek(psr_ptr->stack);
+		int top_symbol = top_node_ptr->symbol;
+
+		if( BitSet_get_bit(psr_ptr->symbol_class_set, top_symbol) == 1 ){
+			// Top of the stack is a terminal
+
+			if(lookahead_symbol == top_symbol){
+				// Match
+				top_node_ptr->tkn_ptr = tkn_ptr;
+
+				// No need to free popped node, already exists in tree
+				LinkedList_pop(psr_ptr->stack);
+
+				if(LinkedList_get_size == 0){
+					// Stack exhausted, parsing over
+					return PARSER_STEP_RESULT_SUCCESS;
+				}
+				else{
+					// Stack not empty, require more input
+					return PARSER_STEP_RESULT_MORE_INPUT;
+				}
+
+			}
+
+			else{
+				// Parsing error, lookahead does not match top of stack
+
+				// Free token, as not added to parse tree, will be lost
+				// otherwise
+				Token_destroy(tkn_ptr);
+
+				return PARSER_STEP_RESULT_FAIL;
+			}
+		}
+
+		else{
+			// Top of stack is non termainl, need to expand
+
+			// Get the row corresponding to top symbol
+			HashTable *var_row_tbl_ptr = HashTable_get(psr_ptr->parse_table, (void *) &top_symbol);
+
+			// Get the rule correspond to lookahead from row
+			Rule *rul_ptr = HashTable_get(var_row_tbl_ptr, (void *) &lookahead_symbol);
+
+			if(rul_ptr != NULL){
+				// Rule exists, expand rule
+
+				// No need to free popped node, already exists in tree
+				LinkedList_pop(psr_ptr->stack);
+
+				// Traverse rule list in reverse
+				for (int i = rul_ptr->len_expansion_symbols - 1; i >= 0; --i){
+					int expansion_symbol = rul_ptr->expansion_symbols[i];
+
+					if( expansion_symbol == psr_ptr->empty_symbol ){
+						// No need to push empty symbol onto stack
+						continue;
+					}
+
+					else{
+						// Add a new node to tree
+						ParseTree_Node *child_node_ptr = ParseTree_Node_add_child_left_end(top_node_ptr, expansion_symbol, NULL);
+						// Also push node onto stack
+						LinkedList_push(psr_ptr->stack, child_node_ptr);
+					}
+				}
+			}
+
+			else{
+				// Parsing error
+
+				// Free token, as not added to parse tree, will be lost
+				// otherwise
+				Token_destroy(tkn_ptr);
+
+				return PARSER_STEP_RESULT_FAIL;
+			}
+		}
+	}
 }
 
 ParseTree *ParserLL1_get_parse_tree(ParserLL1 *psr_ptr){
-
+	return psr_ptr->tree;
 }
 
 
