@@ -142,6 +142,7 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	else
 		psr_ptr->symbols_max = psr_ptr->variable_symbols_max;
 
+	// Create and Initialize symbol class set
 	psr_ptr->symbol_class_set = BitSet_new(psr_ptr->symbols_min, psr_ptr->symbols_max);
 	for (int i = 0; i < len_terminal_symbols; ++i)
 		BitSet_set_bit(psr_ptr->symbol_class_set, psr_ptr->terminal_symbols[i]);
