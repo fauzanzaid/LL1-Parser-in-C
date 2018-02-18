@@ -585,6 +585,17 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 		// Loop until top of the stack is a terminal
 
 		ParseTree_Node *top_node_ptr = LinkedList_peek(psr_ptr->stack);
+
+		if(top_node_ptr == NULL){
+			// No symbols on the stack are left, parsing has ended
+
+			// Free token, as not added to parse tree, will be lost
+			// otherwise
+			Token_destroy(tkn_ptr);
+
+			return PARSER_STEP_RESULT_HALTED;
+		}
+
 		int top_symbol = top_node_ptr->symbol;
 
 		// printf("top=%d\t", top_symbol);
@@ -625,7 +636,7 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 		}
 
 		else{
-			// Top of stack is non termainl, need to expand
+			// Top of stack is non terminal, need to expand
 
 			// Get the row corresponding to top symbol
 			HashTable *var_row_tbl_ptr = HashTable_get(psr_ptr->parse_table, (void *) &top_symbol);
