@@ -17,9 +17,6 @@
 
 #define PARSERLL1_LITERAL_MAX_CHAR 20
 
-static const int SYMBOL_CLASS_VARIABLE = 0;
-static const int SYMBOL_CLASS_TERMINAL = 1;
-
 // ANSI escape codes to print to console
 #define TEXT_RED	"\x1B[31m"
 #define TEXT_GRN	"\x1B[32m"
@@ -775,7 +772,8 @@ void ParserLL1_print_errors(ParserLL1 *psr_ptr){
 
 		printf( TEXT_BLD "%d:%d: " TEXT_RST, tkn_ptr->line, tkn_ptr->column);
 		printf( TEXT_BLD TEXT_RED "syntax error: " TEXT_RST);
-		
+
+
 		// Print token got
 		printf("Got ");
 		if(buffer[0] != '\0'){
