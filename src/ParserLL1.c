@@ -67,6 +67,8 @@ typedef struct ParserLL1{
 
 	int (*token_to_symbol)(Token *);
 	char *(*symbol_to_string)(int);
+	void (*token_to_value)(Token *, char *, int);
+
 	LinkedList *stack;
 	ParseTree_Node *tree;
 	int flag_panic;
@@ -120,7 +122,7 @@ static void add_error(ParserLL1 *psr_ptr, Token* tkn_ptr, int top_symbol);
 // Constructors & Destructors //
 ////////////////////////////////
 
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int (*token_to_symbol)(Token *), char *(*symbol_to_string)(int)){
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int (*token_to_symbol)(Token *), char *(*symbol_to_string)(int), void (*token_to_value)(Token *, char *, int)){
 
 	// Allocate
 	ParserLL1 *psr_ptr = malloc( sizeof(ParserLL1) );
@@ -136,6 +138,8 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	psr_ptr->end_symbol = end_symbol;
 
 	psr_ptr->token_to_symbol = token_to_symbol;
+	psr_ptr->symbol_to_string = symbol_to_string;
+	psr_ptr->token_to_value = token_to_value;
 
 	// Set panic flag to 0
 	psr_ptr->flag_panic = 0;
@@ -754,9 +758,12 @@ void ParserLL1_print_errors(ParserLL1 *psr_ptr){
 
 		Token *tkn_ptr = err_ptr->tkn_ptr;
 		int top_symbol = err_ptr->top_symbol;
+		int lookahead_symbol = psr_ptr->token_to_symbol(tkn_ptr);
+		char *lookahead_symbol_string = psr_ptr->symbol_to_string(lookahead_symbol);
 
 		printf( TEXT_BLD "%d:%d: " TEXT_RST, tkn_ptr->line, tkn_ptr->column);
-		printf( TEXT_BLD TEXT_RED "syntax error" TEXT_RST);
+		printf( TEXT_BLD TEXT_RED "syntax error: " TEXT_RST);
+		printf("Got \"%s\"", lookahead_symbol_string);
 		printf("\n");
 
 		LinkedListIterator_move_to_next(itr_ptr);
