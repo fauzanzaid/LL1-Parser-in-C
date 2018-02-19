@@ -39,9 +39,13 @@ typedef struct ParserLL1 ParserLL1;
  * @param  start_symbol         The start symbol
  * @param  token_to_symbol      A user defined function that takes a terminal
  * token as parameter and outputs the corresponding terminal symbol
+ * @param  symbol_to_string     A user defined function that takes a symbol
+ * identifier as input and returns a pointer to user allocated null terminated
+ * string which can be printed. The string must be kept allocated until the
+ * lifetime of the ParserLL1 struct
  * @return                      Pointer to ParserLL1 struct
  */
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int (*token_to_symbol)(Token *));
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int (*token_to_symbol)(Token *), char *(*symbol_to_string)(int));
 
 /**
  * Deallocates all internally allocated memory to the struct

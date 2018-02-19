@@ -66,6 +66,7 @@ typedef struct ParserLL1{
 	// Parsing
 
 	int (*token_to_symbol)(Token *);
+	char *(*symbol_to_string)(int);
 	LinkedList *stack;
 	ParseTree_Node *tree;
 	int flag_panic;
@@ -119,7 +120,7 @@ static void add_error(ParserLL1 *psr_ptr, Token* tkn_ptr, int top_symbol);
 // Constructors & Destructors //
 ////////////////////////////////
 
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int (*token_to_symbol)(Token *)){
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int (*token_to_symbol)(Token *), char *(*symbol_to_string)(int)){
 
 	// Allocate
 	ParserLL1 *psr_ptr = malloc( sizeof(ParserLL1) );
