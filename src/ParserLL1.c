@@ -18,6 +18,11 @@
 static const int SYMBOL_CLASS_VARIABLE = 0;
 static const int SYMBOL_CLASS_TERMINAL = 1;
 
+// ANSI escape codes to print to console
+#define TEXT_RED	"\x1B[31m"
+#define TEXT_BLD	"\x1B[1m"
+#define TEXT_RST	"\x1B[0m"
+
 
 /////////////////////
 // Data Structures //
@@ -58,11 +63,13 @@ typedef struct ParserLL1{
 	HashTable *follow_table;
 	HashTable *parse_table;
 
-	// Parse tree
+	// Parsing
 
 	int (*token_to_symbol)(Token *);
 	LinkedList *stack;
 	ParseTree_Node *tree;
+	int flag_panic;
+	LinkedList *error_list;
 
 }ParserLL1;
 
@@ -76,6 +83,11 @@ typedef struct Rule{
 	// Next rule with the same variable symbol
 	Rule *next;
 }Rule;
+
+typedef struct ErrorBuffer{
+	Token *tkn_ptr;
+	int top_symbol;
+}ErrorBuffer;
 
 
 /////////////////////////////////
@@ -95,6 +107,12 @@ static void calculate_first_table(ParserLL1 *psr_ptr);
 static void calculate_follow_table(ParserLL1 *psr_ptr);
 
 static void populate_parse_table(ParserLL1 *psr_ptr);
+
+static ErrorBuffer *ErrorBuffer_new(Token *tkn_ptr, int top_symbol);
+
+static void ErrorBuffer_destroy(ErrorBuffer *err_ptr);
+
+static void add_error(ParserLL1 *psr_ptr, Token* tkn_ptr, int top_symbol);
 
 
 ////////////////////////////////
@@ -118,6 +136,8 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 
 	psr_ptr->token_to_symbol = token_to_symbol;
 
+	// Set panic flag to 0
+	psr_ptr->flag_panic = 0;
 
 	// Calc minimum and maximum
 	psr_ptr->variable_symbols_min = INT_MAX;
@@ -187,6 +207,9 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	LinkedList_push(psr_ptr->stack, ParseTree_Node_new(psr_ptr->end_symbol, NULL) );
 	LinkedList_push(psr_ptr->stack, psr_ptr->tree);
 
+	// Create error buffer list
+	psr_ptr->error_list = LinkedList_new();
+
 	return psr_ptr;
 }
 
@@ -238,6 +261,14 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 	// Free parse tree
 	ParseTree_Node_destroy(psr_ptr->tree);
 
+	// Free all buffers in error buffer list
+	while( LinkedList_peek(psr_ptr->error_list) != NULL ){
+		ErrorBuffer_destroy( LinkedList_pop(psr_ptr->error_list) );
+	}
+
+	// Free error buffer list
+	LinkedList_destroy(psr_ptr->error_list);
+
 	// Free parser
 	free(psr_ptr);
 }
@@ -258,6 +289,18 @@ static void Rule_destroy(Rule *rul_ptr){
 	free(rul_ptr->expansion_symbols);
 	free(rul_ptr);
 }
+
+static ErrorBuffer *ErrorBuffer_new(Token *tkn_ptr, int top_symbol){
+	ErrorBuffer *err_ptr = malloc( sizeof(ErrorBuffer) );
+	err_ptr->tkn_ptr = tkn_ptr;
+	err_ptr->top_symbol = top_symbol;
+}
+
+static void ErrorBuffer_destroy(ErrorBuffer *err_ptr){
+	Token_destroy(err_ptr->tkn_ptr);
+	free(err_ptr);
+}
+
 
 
 //////////////////////
@@ -632,9 +675,12 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 
 			else{
 				// Parsing error, lookahead does not match top of stack
-				// Free token, as not added to parse tree, will be lost
-				// otherwise
-				Token_destroy(tkn_ptr);
+				// // Free token, as not added to parse tree, will be lost
+				// // otherwise
+				// Token_destroy(tkn_ptr);
+
+				add_error(psr_ptr, tkn_ptr, top_symbol);
+				psr_ptr->flag_panic = 1;
 
 				return PARSER_STEP_RESULT_FAIL;
 			}
@@ -674,11 +720,14 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 			}
 
 			else{
-				// Parsing error
+				// Parsing error, no entry in parse table
 
-				// Free token, as not added to parse tree, will be lost
-				// otherwise
-				Token_destroy(tkn_ptr);
+				// // Free token, as not added to parse tree, will be lost
+				// // otherwise
+				// Token_destroy(tkn_ptr);
+
+				add_error(psr_ptr, tkn_ptr, top_symbol);
+				psr_ptr->flag_panic = 1;
 
 				return PARSER_STEP_RESULT_FAIL;
 			}
@@ -688,6 +737,37 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 
 ParseTree *ParserLL1_get_parse_tree(ParserLL1 *psr_ptr){
 	return psr_ptr->tree;
+}
+
+
+////////////
+// Errors //
+////////////
+
+void ParserLL1_print_errors(ParserLL1 *psr_ptr){
+	LinkedListIterator *itr_ptr = LinkedListIterator_new(psr_ptr->error_list);
+	LinkedListIterator_move_to_first(itr_ptr);
+
+	ErrorBuffer *err_ptr = LinkedListIterator_get_item(itr_ptr);
+	while(err_ptr){
+
+		Token *tkn_ptr = err_ptr->tkn_ptr;
+		int top_symbol = err_ptr->top_symbol;
+
+		printf( TEXT_BLD "%d:%d: " TEXT_RST, tkn_ptr->line, tkn_ptr->column);
+		printf( TEXT_BLD TEXT_RED "syntax error" TEXT_RST);
+		printf("\n");
+
+		LinkedListIterator_move_to_next(itr_ptr);
+		err_ptr = LinkedListIterator_get_item(itr_ptr);
+	}
+
+	LinkedListIterator_destroy(itr_ptr);
+}
+
+static void add_error(ParserLL1 *psr_ptr, Token* tkn_ptr, int top_symbol){
+	ErrorBuffer *err_ptr = ErrorBuffer_new(tkn_ptr, top_symbol);
+	LinkedList_pushback(psr_ptr->error_list, err_ptr);
 }
 
 

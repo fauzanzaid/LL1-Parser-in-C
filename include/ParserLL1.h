@@ -99,4 +99,16 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr);
  */
 ParseTree *ParserLL1_get_parse_tree(ParserLL1 *psr_ptr);
 
+
+////////////
+// Errors //
+////////////
+
+/**
+ * Prints information about each encountered error so far
+ * @param psr_ptr Pointer to ParserLL1 struct
+ */
+void ParserLL1_print_errors(ParserLL1 *psr_ptr);
+
+
 #endif
