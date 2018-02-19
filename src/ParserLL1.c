@@ -72,7 +72,11 @@ typedef struct ParserLL1{
 
 	LinkedList *stack;
 	ParseTree_Node *tree;
+
 	int flag_panic;
+	int flag_halted;
+	int flag_error_recovery;
+
 	LinkedList *error_list;
 
 }ParserLL1;
@@ -144,6 +148,10 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 
 	// Set panic flag to 0
 	psr_ptr->flag_panic = 0;
+	// If 1, can access parse tree
+	psr_ptr->flag_halted = 0;
+	// If 1, error recovery is active, avoid recording another error
+	psr_ptr->flag_error_recovery = 0;
 
 	// Calc minimum and maximum
 	psr_ptr->variable_symbols_min = INT_MAX;
@@ -662,12 +670,25 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 				// printf("Match\n");
 				top_node_ptr->tkn_ptr = tkn_ptr;
 
+				// This step was successful
+				psr_ptr->flag_error_recovery = 0;
+
 				if(top_symbol == psr_ptr->end_symbol){
 					// End of stack reached, parsing over
 
 					// Need to free end node, as it does not belong to tree
 					ParseTree_Node_destroy( LinkedList_pop(psr_ptr->stack) );
-					return PARSER_STEP_RESULT_SUCCESS;
+
+					// User can access parse tree now
+					psr_ptr->flag_halted = 1;
+
+					if(psr_ptr->flag_panic == 0){
+						// Return success only if no errors were detected
+						return PARSER_STEP_RESULT_SUCCESS;
+					}
+					else{
+						return PARSER_STEP_RESULT_HALTED;
+					}
 				}
 
 				else{
@@ -681,12 +702,16 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 
 			else{
 				// Parsing error, lookahead does not match top of stack
-				// // Free token, as not added to parse tree, will be lost
-				// // otherwise
-				// Token_destroy(tkn_ptr);
 
-				add_error(psr_ptr, tkn_ptr, top_symbol);
 				psr_ptr->flag_panic = 1;
+				add_error(psr_ptr, tkn_ptr, top_symbol);
+
+				// Try to recover. No need to free popped node
+				LinkedList_pop(psr_ptr->stack);
+
+				// Disable error recovery, as terminal matching does not
+				// require it
+				psr_ptr->flag_error_recovery = 0;
 
 				return PARSER_STEP_RESULT_FAIL;
 			}
@@ -728,12 +753,33 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 			else{
 				// Parsing error, no entry in parse table
 
-				// // Free token, as not added to parse tree, will be lost
-				// // otherwise
-				// Token_destroy(tkn_ptr);
-
-				add_error(psr_ptr, tkn_ptr, top_symbol);
 				psr_ptr->flag_panic = 1;
+
+				if(psr_ptr->flag_error_recovery == 1){
+					// Error recovery is active, do not add record
+					Token_destroy(tkn_ptr);
+				}
+				else{
+					add_error(psr_ptr, tkn_ptr, top_symbol);
+				}
+
+				// Try to recover
+				// Check if input is in follow set of top symbol
+
+				BitSet *top_follow_set_ptr = HashTable_get(psr_ptr->follow_table, (void *)&top_symbol);
+
+				if( BitSet_get_bit(top_follow_set_ptr, lookahead_symbol) == 1){
+					// Pop the top symbol. No need to free
+					LinkedList_pop(psr_ptr->stack);
+					// Disable error recovery as action taken
+					psr_ptr->flag_error_recovery = 0;
+				}
+
+				else{
+					// Wait until a symbol in follow set appears
+					psr_ptr->flag_error_recovery = 1;
+				}
+
 
 				return PARSER_STEP_RESULT_FAIL;
 			}
@@ -742,7 +788,10 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 }
 
 ParseTree *ParserLL1_get_parse_tree(ParserLL1 *psr_ptr){
-	return psr_ptr->tree;
+	if(psr_ptr->flag_halted == 1){
+		return psr_ptr->tree;
+	}
+	return NULL;
 }
 
 
