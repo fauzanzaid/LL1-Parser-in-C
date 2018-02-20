@@ -634,7 +634,17 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 	int lookahead_symbol = psr_ptr->token_to_symbol(tkn_ptr);
 
 	// Check if symbol is valid terminal
-	if(lookahead_symbol < psr_ptr->terminal_symbols_min || lookahead_symbol > psr_ptr->terminal_symbols_max){
+	int flag_symbol_known = 0;
+	for (int i = 0; i < psr_ptr->len_terminal_symbols; ++i){
+		if(lookahead_symbol == psr_ptr->terminal_symbols[i]){
+			// Lookahead symbol belongs to terminal set of this parser
+			flag_symbol_known = 1;
+			break;
+		}
+	}
+
+	if(flag_symbol_known == 0){
+		// Symbol is invalid
 
 		// Free token, as not added to parse tree, will be lost
 		// otherwise
