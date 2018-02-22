@@ -736,7 +736,7 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 
 				if( BitSet_get_bit(psr_ptr->forget_terminal_symbol_set, lookahead_symbol) ){
 					// Assume user wanted to put the lookahead here.  Pop
-					// symbol as if match ws found. No need to free popped
+					// symbol as if match was found. No need to free popped
 					// symbol
 					LinkedList_pop(psr_ptr->stack);
 
@@ -802,7 +802,7 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 
 				if(psr_ptr->flag_error_recovery == 1){
 					// Error recovery is active, do not record additional error
-					Token_destroy(tkn_ptr);
+					// No need to destroy token
 				}
 				else{
 					// Enable error recovery and record error
