@@ -50,8 +50,15 @@ typedef struct ParserLL1{
 	int empty_symbol;
 	int end_symbol;
 
+	// Terminals that user might forget
+	int *forget_terminal_symbols;
+	int len_forget_terminal_symbols;
+
 	// Set for terminals, clear for variables
 	BitSet *symbol_class_set;
+
+	// Set for marking forget terminal symbols
+	BitSet *forget_terminal_symbol_set;
 
 
 	// Rules
@@ -73,7 +80,7 @@ typedef struct ParserLL1{
 	LinkedList *stack;
 	ParseTree_Node *tree;
 
-	int flag_panic;
+	int flag_errors_found;
 	int flag_halted;
 	int flag_error_recovery;
 
@@ -127,7 +134,7 @@ static void add_error(ParserLL1 *psr_ptr, Token* tkn_ptr, int top_symbol);
 // Constructors & Destructors //
 ////////////////////////////////
 
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int (*token_to_symbol)(Token *), char *(*symbol_to_string)(int), void (*token_to_value)(Token *, char *, int)){
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int *forget_terminal_symbols, int len_forget_terminal_symbols, int (*token_to_symbol)(Token *), char *(*symbol_to_string)(int), void (*token_to_value)(Token *, char *, int)){
 
 	// Allocate
 	ParserLL1 *psr_ptr = malloc( sizeof(ParserLL1) );
@@ -141,13 +148,15 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	psr_ptr->start_symbol = start_symbol;
 	psr_ptr->empty_symbol = empty_symbol;
 	psr_ptr->end_symbol = end_symbol;
+	psr_ptr->forget_terminal_symbols = forget_terminal_symbols;
+	psr_ptr->len_forget_terminal_symbols = len_forget_terminal_symbols;
 
 	psr_ptr->token_to_symbol = token_to_symbol;
 	psr_ptr->symbol_to_string = symbol_to_string;
 	psr_ptr->token_to_value = token_to_value;
 
-	// Set panic flag to 0
-	psr_ptr->flag_panic = 0;
+	// Set error flag to 0
+	psr_ptr->flag_errors_found = 0;
 	// If 1, can access parse tree
 	psr_ptr->flag_halted = 0;
 	// If 1, error recovery is active, avoid recording another error
@@ -187,6 +196,11 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	psr_ptr->symbol_class_set = BitSet_new(psr_ptr->symbols_min, psr_ptr->symbols_max);
 	for (int i = 0; i < len_terminal_symbols; ++i)
 		BitSet_set_bit(psr_ptr->symbol_class_set, psr_ptr->terminal_symbols[i]);
+
+	// Create and initialize forget terminal symbol set
+	psr_ptr->forget_terminal_symbol_set = BitSet_new(psr_ptr->terminal_symbols_min, psr_ptr->terminal_symbols_max);
+	for (int i = 0; i < len_forget_terminal_symbols; ++i)
+		BitSet_set_bit(psr_ptr->forget_terminal_symbol_set, psr_ptr->forget_terminal_symbols[i]);
 
 	// Create rule table
 	psr_ptr->rule_table = HashTable_new(len_variable_symbols, hash_function, key_compare);
@@ -230,6 +244,9 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 void ParserLL1_destroy(ParserLL1 *psr_ptr){
 	// Free symbol class set
 	BitSet_destroy(psr_ptr->symbol_class_set);
+
+	// Free forget terminal symbol set
+	BitSet_destroy(psr_ptr->forget_terminal_symbol_set);
 
 	// Free rule_table and rules
 	for (int i = 0; i < psr_ptr->len_variable_symbols; ++i){
@@ -692,7 +709,7 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 					// User can access parse tree now
 					psr_ptr->flag_halted = 1;
 
-					if(psr_ptr->flag_panic == 0){
+					if(psr_ptr->flag_errors_found == 0){
 						// Return success only if no errors were detected
 						return PARSER_STEP_RESULT_SUCCESS;
 					}
@@ -713,15 +730,33 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 			else{
 				// Parsing error, lookahead does not match top of stack
 
-				psr_ptr->flag_panic = 1;
-				add_error(psr_ptr, tkn_ptr, top_symbol);
+				psr_ptr->flag_errors_found = 1;
+				psr_ptr->flag_error_recovery = 1;
 
-				// Try to recover. No need to free popped node
-				LinkedList_pop(psr_ptr->stack);
 
-				// Disable error recovery, as terminal matching does not
-				// require it
-				psr_ptr->flag_error_recovery = 0;
+				if( BitSet_get_bit(psr_ptr->forget_terminal_symbol_set, lookahead_symbol) ){
+					// Assume user wanted to put the lookahead here.  Pop
+					// symbol as if match ws found. No need to free popped
+					// symbol
+					LinkedList_pop(psr_ptr->stack);
+
+					// Disable error recovery, as action taken
+					psr_ptr->flag_error_recovery = 0;
+
+					add_error(psr_ptr, tkn_ptr, top_symbol);
+				}
+
+				else if(psr_ptr->flag_error_recovery == 1){
+					// Ignore input symbol and continue. Error recovery
+					// active, not need to record error anew
+					Token_destroy(tkn_ptr);
+				}
+
+				else{
+					// Enable error recovery and record error
+					psr_ptr->flag_error_recovery = 1;
+					add_error(psr_ptr, tkn_ptr, top_symbol);
+				}
 
 				return PARSER_STEP_RESULT_FAIL;
 			}
@@ -763,14 +798,16 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 			else{
 				// Parsing error, no entry in parse table
 
-				psr_ptr->flag_panic = 1;
+				psr_ptr->flag_errors_found = 1;
 
 				if(psr_ptr->flag_error_recovery == 1){
-					// Error recovery is active, do not add record
+					// Error recovery is active, do not record additional error
 					Token_destroy(tkn_ptr);
 				}
 				else{
+					// Enable error recovery and record error
 					add_error(psr_ptr, tkn_ptr, top_symbol);
+					psr_ptr->flag_error_recovery = 1;
 				}
 
 				// Try to recover
@@ -783,25 +820,22 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 					LinkedList_pop(psr_ptr->stack);
 					// Disable error recovery as action taken
 					psr_ptr->flag_error_recovery = 0;
+
+					// Contnue to search, no return
 				}
 
 				else{
-					// Wait until a symbol in follow set appears
+					// Wait until a symbol in follow set appears, or match is found
 					psr_ptr->flag_error_recovery = 1;
+					return PARSER_STEP_RESULT_FAIL;
 				}
-
-
-				return PARSER_STEP_RESULT_FAIL;
 			}
 		}
 	}
 }
 
 ParseTree *ParserLL1_get_parse_tree(ParserLL1 *psr_ptr){
-	if(psr_ptr->flag_halted == 1){
-		return psr_ptr->tree;
-	}
-	return NULL;
+	return psr_ptr->tree;
 }
 
 

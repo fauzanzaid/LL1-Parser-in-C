@@ -45,7 +45,7 @@ typedef struct ParserLL1 ParserLL1;
  * lifetime of the ParserLL1 struct
  * @return                      Pointer to ParserLL1 struct
  */
-ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int (*token_to_symbol)(Token *), char *(*symbol_to_string)(int), void (*token_to_value)(Token *, char *, int));
+ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *terminal_symbols, int len_terminal_symbols, int start_symbol, int empty_symbol, int end_symbol, int *forget_terminal_symbols, int len_forget_terminal_symbols, int (*token_to_symbol)(Token *), char *(*symbol_to_string)(int), void (*token_to_value)(Token *, char *, int));
 
 /**
  * Deallocates all internally allocated memory to the struct
