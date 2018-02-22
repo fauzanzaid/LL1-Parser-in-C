@@ -752,10 +752,13 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 
 
 				if( BitSet_get_bit(psr_ptr->forget_terminal_symbol_set, top_symbol) == 0 ){
-					// Pop the top and discard lookahead as if they had matched.
+					// Pop the top, if it is not end symbol, and discard
+					// lookahead as if they had matched.
 
-					// No need to free popped node
-					LinkedList_pop(psr_ptr->stack);
+					if(top_symbol != psr_ptr->end_symbol){
+						// No need to free popped node, as it is not end symbol
+						LinkedList_pop(psr_ptr->stack);
+					}
 
 					if(psr_ptr->flag_error_recovery == 1){
 						// Error recovery active, not need to record error
