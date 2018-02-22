@@ -129,6 +129,7 @@ static void ErrorBuffer_destroy(ErrorBuffer *err_ptr);
 
 static void add_error(ParserLL1 *psr_ptr, Token* tkn_ptr, int top_symbol);
 
+static void print_error(ParserLL1 *psr_ptr, ErrorBuffer *err_ptr);
 
 ////////////////////////////////
 // Constructors & Destructors //
@@ -849,68 +850,7 @@ void ParserLL1_print_errors(ParserLL1 *psr_ptr){
 
 	ErrorBuffer *err_ptr = LinkedListIterator_get_item(itr_ptr);
 	while(err_ptr){
-
-		Token *tkn_ptr = err_ptr->tkn_ptr;
-		int top_symbol = err_ptr->top_symbol;
-		int lookahead_symbol = psr_ptr->token_to_symbol(tkn_ptr);
-		char *lookahead_symbol_string = psr_ptr->symbol_to_string(lookahead_symbol);
-
-		// Get value of token if it exists
-		// Add characters for \0 and truncation check
-		int len_buffer = PARSERLL1_LITERAL_MAX_CHAR + 2;
-		char buffer[len_buffer];
-		memset(buffer, '\0', len_buffer);
-		psr_ptr->token_to_value(tkn_ptr, buffer, len_buffer);
-
-
-		printf( TEXT_BLD "%d:%d: " TEXT_RST, tkn_ptr->line, tkn_ptr->column);
-		printf( TEXT_BLD TEXT_RED "syntax error: " TEXT_RST);
-
-
-		// Print token got
-		printf("Got ");
-		if(buffer[0] != '\0'){
-			// Value string exists
-
-			if(buffer[len_buffer-2] != '\0'){
-				// value string truncate
-				buffer[len_buffer-2] = '\0';
-				printf("\"" TEXT_BLD TEXT_YLW "" "%s" TEXT_RST "...\" (%s)", buffer, lookahead_symbol_string);
-			}
-			else{
-				// Print value string as is
-				printf("\"" TEXT_BLD TEXT_YLW "" "%s" TEXT_RST "\" (%s)", buffer, lookahead_symbol_string);
-			}
-		}
-		else{
-			// Print without value string
-			printf("\"" TEXT_BLD TEXT_YLW "" "%s" TEXT_RST "\"" , lookahead_symbol_string);
-		}
-		printf(". ");
-
-
-		// Print token expected
-		printf("Expected ");
-		if( BitSet_get_bit(psr_ptr->symbol_class_set, top_symbol) == 1){
-			// Top symbol is terminal
-			char *top_symbol_string = psr_ptr->symbol_to_string(top_symbol);
-			printf("\"" TEXT_BLD TEXT_GRN "%s" TEXT_RST "\"" , top_symbol_string);
-		}
-		else{
-			HashTable *var_row_tbl_ptr = HashTable_get(psr_ptr->parse_table, (void *)&top_symbol);
-
-			for (int i = 0; i < psr_ptr->len_terminal_symbols; ++i){
-				// Check each terminal
-
-				if( HashTable_get(var_row_tbl_ptr, (void *)&(psr_ptr->terminal_symbols[i]) ) != NULL ){
-					// Entry exists in parse table
-					char *terminal_symbol_string = psr_ptr->symbol_to_string(psr_ptr->terminal_symbols[i]);
-					printf("\"" TEXT_BLD TEXT_GRN "%s" TEXT_RST "\" " , terminal_symbol_string);
-				}
-			}
-		}
-		printf("\n");
-
+		print_error(psr_ptr, err_ptr);
 		LinkedListIterator_move_to_next(itr_ptr);
 		err_ptr = LinkedListIterator_get_item(itr_ptr);
 	}
@@ -920,7 +860,71 @@ void ParserLL1_print_errors(ParserLL1 *psr_ptr){
 
 static void add_error(ParserLL1 *psr_ptr, Token* tkn_ptr, int top_symbol){
 	ErrorBuffer *err_ptr = ErrorBuffer_new(tkn_ptr, top_symbol);
+	print_error(psr_ptr, err_ptr);
 	LinkedList_pushback(psr_ptr->error_list, err_ptr);
+}
+
+static void print_error(ParserLL1 *psr_ptr, ErrorBuffer *err_ptr){
+	Token *tkn_ptr = err_ptr->tkn_ptr;
+	int top_symbol = err_ptr->top_symbol;
+	int lookahead_symbol = psr_ptr->token_to_symbol(tkn_ptr);
+	char *lookahead_symbol_string = psr_ptr->symbol_to_string(lookahead_symbol);
+
+	// Get value of token if it exists
+	// Add characters for \0 and truncation check
+	int len_buffer = PARSERLL1_LITERAL_MAX_CHAR + 2;
+	char buffer[len_buffer];
+	memset(buffer, '\0', len_buffer);
+	psr_ptr->token_to_value(tkn_ptr, buffer, len_buffer);
+
+
+	printf( TEXT_BLD "%d:%d: " TEXT_RST, tkn_ptr->line, tkn_ptr->column);
+	printf( TEXT_BLD TEXT_RED "syntax error: " TEXT_RST);
+
+
+	// Print token got
+	printf("Got ");
+	if(buffer[0] != '\0'){
+		// Value string exists
+
+		if(buffer[len_buffer-2] != '\0'){
+			// value string truncate
+			buffer[len_buffer-2] = '\0';
+			printf("\"" TEXT_BLD TEXT_YLW "" "%s" TEXT_RST "...\" (%s)", buffer, lookahead_symbol_string);
+		}
+		else{
+			// Print value string as is
+			printf("\"" TEXT_BLD TEXT_YLW "" "%s" TEXT_RST "\" (%s)", buffer, lookahead_symbol_string);
+		}
+	}
+	else{
+		// Print without value string
+		printf("\"" TEXT_BLD TEXT_YLW "" "%s" TEXT_RST "\"" , lookahead_symbol_string);
+	}
+	printf(". ");
+
+
+	// Print token expected
+	printf("Expected ");
+	if( BitSet_get_bit(psr_ptr->symbol_class_set, top_symbol) == 1){
+		// Top symbol is terminal
+		char *top_symbol_string = psr_ptr->symbol_to_string(top_symbol);
+		printf("\"" TEXT_BLD TEXT_GRN "%s" TEXT_RST "\"" , top_symbol_string);
+	}
+	else{
+		HashTable *var_row_tbl_ptr = HashTable_get(psr_ptr->parse_table, (void *)&top_symbol);
+
+		for (int i = 0; i < psr_ptr->len_terminal_symbols; ++i){
+			// Check each terminal
+
+			if( HashTable_get(var_row_tbl_ptr, (void *)&(psr_ptr->terminal_symbols[i]) ) != NULL ){
+				// Entry exists in parse table
+				char *terminal_symbol_string = psr_ptr->symbol_to_string(psr_ptr->terminal_symbols[i]);
+				printf("\"" TEXT_BLD TEXT_GRN "%s" TEXT_RST "\" " , terminal_symbol_string);
+			}
+		}
+	}
+	printf("\n");
 }
 
 
