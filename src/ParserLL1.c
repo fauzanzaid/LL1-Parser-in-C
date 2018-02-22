@@ -100,7 +100,13 @@ typedef struct Rule{
 }Rule;
 
 typedef struct ErrorBuffer{
-	Token *tkn_ptr;
+	int lookahead_symbol;
+	int line, column;
+
+	char *value;
+	char *buffer;
+	int len_buffer;
+
 	int top_symbol;
 }ErrorBuffer;
 
@@ -123,7 +129,7 @@ static void calculate_follow_table(ParserLL1 *psr_ptr);
 
 static void populate_parse_table(ParserLL1 *psr_ptr);
 
-static ErrorBuffer *ErrorBuffer_new(Token *tkn_ptr, int top_symbol);
+static ErrorBuffer *ErrorBuffer_new(ParserLL1 *psr_ptr, Token *tkn_ptr, int top_symbol);
 
 static void ErrorBuffer_destroy(ErrorBuffer *err_ptr);
 
@@ -322,14 +328,25 @@ static void Rule_destroy(Rule *rul_ptr){
 	free(rul_ptr);
 }
 
-static ErrorBuffer *ErrorBuffer_new(Token *tkn_ptr, int top_symbol){
+static ErrorBuffer *ErrorBuffer_new(ParserLL1 *psr_ptr, Token *tkn_ptr, int top_symbol){
 	ErrorBuffer *err_ptr = malloc( sizeof(ErrorBuffer) );
-	err_ptr->tkn_ptr = tkn_ptr;
+	err_ptr->lookahead_symbol = psr_ptr->token_to_symbol(tkn_ptr);
+
+	err_ptr->line = tkn_ptr->line;
+	err_ptr->column = tkn_ptr->column;
+
+	// Get value of token if it exists
+	// Add characters for \0 and truncation check
+	err_ptr->len_buffer = PARSERLL1_LITERAL_MAX_CHAR + 2;
+	err_ptr->buffer = malloc( sizeof(char) * err_ptr->len_buffer );
+	memset(err_ptr->buffer, '\0', err_ptr->len_buffer);
+	psr_ptr->token_to_value(tkn_ptr, err_ptr->buffer, err_ptr->len_buffer);
+
 	err_ptr->top_symbol = top_symbol;
 }
 
 static void ErrorBuffer_destroy(ErrorBuffer *err_ptr){
-	Token_destroy(err_ptr->tkn_ptr);
+	free(err_ptr->buffer);
 	free(err_ptr);
 }
 
@@ -732,34 +749,45 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 				// Parsing error, lookahead does not match top of stack
 
 				psr_ptr->flag_errors_found = 1;
-				psr_ptr->flag_error_recovery = 1;
 
 
-				if( BitSet_get_bit(psr_ptr->forget_terminal_symbol_set, lookahead_symbol) ){
-					// Assume user wanted to put the lookahead here.  Pop
-					// symbol as if match was found. No need to free popped
-					// symbol
+				if( BitSet_get_bit(psr_ptr->forget_terminal_symbol_set, top_symbol) == 0 ){
+					// Pop the top and discard lookahead as if they had matched.
+
+					// No need to free popped node
+					LinkedList_pop(psr_ptr->stack);
+
+					if(psr_ptr->flag_error_recovery == 1){
+						// Error recovery active, not need to record error
+					}
+
+					else{
+						// Enable error recovery and record error
+						psr_ptr->flag_error_recovery = 1;
+						add_error(psr_ptr, tkn_ptr, top_symbol);
+					}
+
+					// Discard token
+					Token_destroy(tkn_ptr);
+
+					return PARSER_STEP_RESULT_FAIL;
+				}
+
+				else{
+					// Assume user wanted to put the top before lookahead
+					// here. Pop top as if match was found before lookahead.
+					// Continue to search a match for lookahead
+
+					// No need to free popped node
 					LinkedList_pop(psr_ptr->stack);
 
 					// Disable error recovery, as action taken
 					psr_ptr->flag_error_recovery = 0;
 
 					add_error(psr_ptr, tkn_ptr, top_symbol);
-				}
 
-				else if(psr_ptr->flag_error_recovery == 1){
-					// Ignore input symbol and continue. Error recovery
-					// active, not need to record error anew
-					Token_destroy(tkn_ptr);
+					// No return, continue to search for a match
 				}
-
-				else{
-					// Enable error recovery and record error
-					psr_ptr->flag_error_recovery = 1;
-					add_error(psr_ptr, tkn_ptr, top_symbol);
-				}
-
-				return PARSER_STEP_RESULT_FAIL;
 			}
 		}
 
@@ -774,6 +802,9 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 
 			if(rul_ptr != NULL){
 				// Rule exists, expand rule
+
+				// This step was successful
+				psr_ptr->flag_error_recovery = 0;
 
 				// No need to free popped node, already exists in tree
 				LinkedList_pop(psr_ptr->stack);
@@ -828,6 +859,10 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 				else{
 					// Wait until a symbol in follow set appears, or match is found
 					psr_ptr->flag_error_recovery = 1;
+
+					// Discard token
+					Token_destroy(tkn_ptr);
+
 					return PARSER_STEP_RESULT_FAIL;
 				}
 			}
@@ -859,26 +894,20 @@ void ParserLL1_print_errors(ParserLL1 *psr_ptr){
 }
 
 static void add_error(ParserLL1 *psr_ptr, Token* tkn_ptr, int top_symbol){
-	ErrorBuffer *err_ptr = ErrorBuffer_new(tkn_ptr, top_symbol);
+	ErrorBuffer *err_ptr = ErrorBuffer_new(psr_ptr, tkn_ptr, top_symbol);
 	print_error(psr_ptr, err_ptr);
 	LinkedList_pushback(psr_ptr->error_list, err_ptr);
 }
 
 static void print_error(ParserLL1 *psr_ptr, ErrorBuffer *err_ptr){
-	Token *tkn_ptr = err_ptr->tkn_ptr;
 	int top_symbol = err_ptr->top_symbol;
-	int lookahead_symbol = psr_ptr->token_to_symbol(tkn_ptr);
+	int lookahead_symbol = err_ptr->lookahead_symbol;
 	char *lookahead_symbol_string = psr_ptr->symbol_to_string(lookahead_symbol);
-
-	// Get value of token if it exists
-	// Add characters for \0 and truncation check
-	int len_buffer = PARSERLL1_LITERAL_MAX_CHAR + 2;
-	char buffer[len_buffer];
-	memset(buffer, '\0', len_buffer);
-	psr_ptr->token_to_value(tkn_ptr, buffer, len_buffer);
+	char *buffer = err_ptr->buffer;
+	int len_buffer = err_ptr->len_buffer;
 
 
-	printf( TEXT_BLD "%d:%d: " TEXT_RST, tkn_ptr->line, tkn_ptr->column);
+	printf( TEXT_BLD "%d:%d: " TEXT_RST, err_ptr->line, err_ptr->column);
 	printf( TEXT_BLD TEXT_RED "syntax error: " TEXT_RST);
 
 
