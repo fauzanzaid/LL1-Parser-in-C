@@ -63,12 +63,14 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr);
  * Arrays values are copied by this function, passed arrays need not be kept
  * allocated by the user after calling this function
  * @param psr_ptr               Pointer to ParserLL1 struct
+ * @param rule_num              Rule number. Non leaf parse tree nodes will have
+ * this attribute to specify which rule was used to expand that node
  * @param variable_symbol       The LHS symbol
  * @param expansion_symbols     Array of RHS symbols in order. Can be NULL for
  * empty string
  * @param len_expansion_symbols Length of array. Can be zero
  */
-void ParserLL1_add_rule(ParserLL1 *psr_ptr, int variable_symbol, int *expansion_symbols, int len_expansion_symbols);
+void ParserLL1_add_rule(ParserLL1 *psr_ptr, int rule_num, int variable_symbol, int *expansion_symbols, int len_expansion_symbols);
 
 /**
  * Calculates the first and follow sets for each symbol and initializes the
@@ -114,5 +116,12 @@ ParseTree *ParserLL1_get_parse_tree(ParserLL1 *psr_ptr);
  */
 void ParserLL1_print_errors(ParserLL1 *psr_ptr);
 
+/**
+ * Set if parsing errors should be printed immediately on stdout as soon as they
+ * are detected
+ * @param psr_ptr Pointer to ParserLL1 struct
+ * @param val     0 to not print, non zero to print
+ */
+void ParserLL1_set_immediate_print_error(ParserLL1 *psr_ptr, int val);
 
 #endif

@@ -83,6 +83,7 @@ typedef struct ParserLL1{
 	int flag_errors_found;
 	int flag_halted;
 	int flag_error_recovery;
+	int flag_immediate_print_error;
 
 	LinkedList *error_list;
 
@@ -91,6 +92,8 @@ typedef struct ParserLL1{
 typedef struct Rule Rule;
 
 typedef struct Rule{
+	int rule_num;
+
 	int variable_symbol;
 	int *expansion_symbols;
 	int len_expansion_symbols;
@@ -115,7 +118,7 @@ typedef struct ErrorBuffer{
 // Private Function Prototypes //
 /////////////////////////////////
 
-static Rule *Rule_new(int variable_symbol, int *expansion_symbols, int len_expansion_symbols);
+static Rule *Rule_new(int rule_num, int variable_symbol, int *expansion_symbols, int len_expansion_symbols);
 
 static void Rule_destroy(Rule *rul_ptr);
 
@@ -168,6 +171,8 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	psr_ptr->flag_halted = 0;
 	// If 1, error recovery is active, avoid recording another error
 	psr_ptr->flag_error_recovery = 0;
+	// If 1, parsing errors printed immediately on being encountered
+	psr_ptr->flag_immediate_print_error = 0;
 
 	// Calc minimum and maximum
 	psr_ptr->variable_symbols_min = INT_MAX;
@@ -311,9 +316,10 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 	free(psr_ptr);
 }
 
-static Rule *Rule_new(int variable_symbol, int *expansion_symbols, int len_expansion_symbols){
+static Rule *Rule_new(int rule_num, int variable_symbol, int *expansion_symbols, int len_expansion_symbols){
 	Rule *rul_ptr = malloc( sizeof(Rule) );
 	
+	rul_ptr->rule_num = rule_num;
 	rul_ptr->variable_symbol = variable_symbol;
 	rul_ptr->expansion_symbols = malloc( sizeof(int) * len_expansion_symbols );
 	memcpy( rul_ptr->expansion_symbols, expansion_symbols, sizeof(int) * len_expansion_symbols );
@@ -356,8 +362,8 @@ static void ErrorBuffer_destroy(ErrorBuffer *err_ptr){
 // Production rules //
 //////////////////////
 
-void ParserLL1_add_rule(ParserLL1 *psr_ptr, int variable_symbol, int *expansion_symbols, int len_expansion_symbols){
-	Rule *new_rul_ptr = Rule_new(variable_symbol, expansion_symbols, len_expansion_symbols);
+void ParserLL1_add_rule(ParserLL1 *psr_ptr, int rule_num, int variable_symbol, int *expansion_symbols, int len_expansion_symbols){
+	Rule *new_rul_ptr = Rule_new(rule_num, variable_symbol, expansion_symbols, len_expansion_symbols);
 	Rule *prev_rul_ptr = HashTable_get(psr_ptr->rule_table, (void*) &(new_rul_ptr->variable_symbol) );
 
 	if(prev_rul_ptr == NULL){
@@ -810,7 +816,9 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 				psr_ptr->flag_error_recovery = 0;
 
 				// No need to free popped node, already exists in tree
-				LinkedList_pop(psr_ptr->stack);
+				ParseTree_Node *parent_node_ptr = LinkedList_pop(psr_ptr->stack);
+				// Add rule number to popped node
+				parent_node_ptr->rule_num = rul_ptr->rule_num;
 
 				// Traverse rule list in reverse
 				for (int i = rul_ptr->len_expansion_symbols - 1; i >= 0; --i){
@@ -896,9 +904,16 @@ void ParserLL1_print_errors(ParserLL1 *psr_ptr){
 	LinkedListIterator_destroy(itr_ptr);
 }
 
+void ParserLL1_set_immediate_print_error(ParserLL1 *psr_ptr, int val){
+	psr_ptr->flag_immediate_print_error = val;
+}
+
 static void add_error(ParserLL1 *psr_ptr, Token* tkn_ptr, int top_symbol){
 	ErrorBuffer *err_ptr = ErrorBuffer_new(psr_ptr, tkn_ptr, top_symbol);
-	print_error(psr_ptr, err_ptr);
+
+	if(psr_ptr->flag_immediate_print_error)
+		print_error(psr_ptr, err_ptr);
+
 	LinkedList_pushback(psr_ptr->error_list, err_ptr);
 }
 
