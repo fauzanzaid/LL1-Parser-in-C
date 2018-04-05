@@ -241,7 +241,7 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	// Create stack
 	psr_ptr->stack = LinkedList_new();
 
-	// Create Parse Tree. This is not freed when parser is destroyed, must be freed by the caller
+	// Create Parse Tree. This is freed when parser is destroyed
 	// Add end symbol and starting symbol to tree and stack
 	psr_ptr->tree = ParseTree_Node_new(psr_ptr->start_symbol, NULL);
 	LinkedList_push(psr_ptr->stack, ParseTree_Node_new(psr_ptr->end_symbol, NULL) );
