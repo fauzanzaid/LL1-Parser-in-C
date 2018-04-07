@@ -725,6 +725,9 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 				// printf("Match\n");
 				top_node_ptr->tkn_ptr = tkn_ptr;
 
+				// Terminal rule number is 0
+				top_node_ptr->rule_num = 0;
+
 				// This step was successful
 				psr_ptr->flag_error_recovery = 0;
 
