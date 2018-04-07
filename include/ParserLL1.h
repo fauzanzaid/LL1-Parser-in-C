@@ -98,8 +98,8 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr);
 
 /**
  * Returns a pointer to the internally constructed parse tree, if it has been
- * completely constructed. Otherwise returns NULL. The tree will be freed when
- * the corresponding ParserLL1 struct is freed
+ * completely constructed. Otherwise returns NULL. The tree must be freed by the
+ * user if this function is called
  * @param  psr_ptr Pointer to ParserLL1 struct
  * @return         Pointer to ParseTree struct
  */

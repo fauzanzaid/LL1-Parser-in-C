@@ -84,6 +84,7 @@ typedef struct ParserLL1{
 	int flag_halted;
 	int flag_error_recovery;
 	int flag_immediate_print_error;
+	int flag_free_parse_tree;
 
 	LinkedList *error_list;
 
@@ -173,6 +174,8 @@ ParserLL1 *ParserLL1_new(int *variable_symbols, int len_variable_symbols, int *t
 	psr_ptr->flag_error_recovery = 0;
 	// If 1, parsing errors printed immediately on being encountered
 	psr_ptr->flag_immediate_print_error = 0;
+	// If 0, parse tree wont be freed when parser is destoryed
+	psr_ptr->flag_free_parse_tree = 1;
 
 	// Calc minimum and maximum
 	psr_ptr->variable_symbols_min = INT_MAX;
@@ -302,7 +305,8 @@ void ParserLL1_destroy(ParserLL1 *psr_ptr){
 	LinkedList_destroy(psr_ptr->stack);
 
 	// Free parse tree
-	ParseTree_Node_destroy(psr_ptr->tree);
+	if(psr_ptr->flag_free_parse_tree == 1)
+		ParseTree_Node_destroy(psr_ptr->tree);
 
 	// Free all buffers in error buffer list
 	while( LinkedList_peek(psr_ptr->error_list) != NULL ){
@@ -883,6 +887,7 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 }
 
 ParseTree *ParserLL1_get_parse_tree(ParserLL1 *psr_ptr){
+	psr_ptr->flag_free_parse_tree = 0;
 	return psr_ptr->tree;
 }
 
