@@ -831,7 +831,7 @@ Parser_StepResult_type ParserLL1_step(ParserLL1 *psr_ptr, Token *tkn_ptr){
 
 					else{
 						// Add a new node to tree
-						ParseTree_Node *child_node_ptr = ParseTree_Node_add_child_left_end(top_node_ptr, expansion_symbol, NULL);
+						ParseTree_Node *child_node_ptr = ParseTree_Node_create_child_left_end(top_node_ptr, expansion_symbol, NULL);
 						child_node_ptr->symbol_index = i;
 						// Also push node onto stack
 						LinkedList_push(psr_ptr->stack, child_node_ptr);
