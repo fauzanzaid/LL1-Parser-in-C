@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project( ParserLL1 VERSION 0.1.1 )
+project( ParserLL1 VERSION 0.1.0 )
 
 add_library(ParserLL1 STATIC src/ParserLL1.c)
 
